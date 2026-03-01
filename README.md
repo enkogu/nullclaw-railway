@@ -2,7 +2,7 @@
 
 Railway-ready repository for running [nullclaw](https://github.com/nullclaw/nullclaw) as a long-lived gateway service.
 
-This repo builds `nullclaw` from source in Docker, bootstraps a valid `~/.nullclaw/config.json` from environment variables, and starts:
+This repo builds `nullclaw` from source in Docker, bootstraps `~/.nullclaw/config.json` from environment variables, and starts:
 
 ```bash
 nullclaw gateway --host 0.0.0.0 --port $PORT
@@ -11,108 +11,128 @@ nullclaw gateway --host 0.0.0.0 --port $PORT
 ## What this deploys
 
 - Upstream source: `https://github.com/nullclaw/nullclaw`
-- Default pinned ref: `v2026.2.26` (change via Docker build arg `NULLCLAW_REF`)
-- Applies local patch: `patches/0001-subagent-wakeup.patch` (subagent completion wakes main session and routes reply back to originating chat)
-- HTTP health endpoint: `/health`
+- Default pinned ref: `4101f63` (change with Docker build arg `NULLCLAW_REF`)
+- Applies local patch: `patches/0001-subagent-wakeup.patch`
+  - subagent completion wakes the main session
+  - reply is routed back to the original channel/chat (including Telegram)
+- Health endpoint: `/health`
 
-## 1) Push this repo to GitHub
+## Deploy on Railway
 
-```bash
-git init
-git add .
-git commit -m "Railway deployment for nullclaw"
-git branch -M main
-git remote add origin git@github.com:<you>/<repo>.git
-git push -u origin main
-```
+1. Create a new Railway project from this GitHub repository.
+2. Add environment variables (see below).
+3. Deploy.
+4. Optional but recommended: mount a volume at `/data`.
 
-## 2) Deploy on Railway
+## Required env
 
-1. In Railway, click **New Project** -> **Deploy from GitHub repo**.
-2. Select this repository.
-3. Railway will build from `Dockerfile` automatically.
-4. Add environment variables (minimum: one API key variable).
+Use one:
 
-### Required environment variable
-
-Use one of:
-
-- `NULLCLAW_API_KEY` (works for any selected provider), or
-- provider-specific key var matching `NULLCLAW_PROVIDER`:
+- `NULLCLAW_API_KEY`
+- or provider-specific key matching `NULLCLAW_PROVIDER`:
   - `OPENROUTER_API_KEY`
   - `OPENAI_API_KEY`
-  - `ANTHROPIC_OAUTH_TOKEN` (Claude subscription/setup token)
-  - `ANTHROPIC_API_KEY`
+  - `ANTHROPIC_API_KEY` / `ANTHROPIC_OAUTH_TOKEN`
 
-### Optional environment variables
+Common:
 
 - `NULLCLAW_PROVIDER` (default: `openrouter`)
-- `NULLCLAW_MODEL` (optional; defaults are provider-specific)
-- `NULLCLAW_GATEWAY_HOST` (default: `0.0.0.0`)
-- `NULLCLAW_ALLOW_PUBLIC_BIND` (default: `true`)
-- `NULLCLAW_REQUIRE_PAIRING` (default: `false`)
-- `NULLCLAW_REWRITE_CONFIG` (default: `false`)
+- `NULLCLAW_MODEL` (optional)
+- `PORT` (default: `3000`)
+- `NULLCLAW_REWRITE_CONFIG` (`true` to regenerate config once, then set back to `false`)
 
-### Claude Subscription (Anthropic OAuth token)
+## Claude/OpenAI subscription auth
 
-For Claude Code subscription/setup tokens (`sk-ant-oat01-...`):
+### Anthropic subscription token
 
 - `NULLCLAW_PROVIDER=anthropic`
 - `ANTHROPIC_OAUTH_TOKEN=sk-ant-oat01-...`
-- Optional model: `NULLCLAW_MODEL=claude-sonnet-4-6`
 
-The image supports this directly.
-
-### OpenAI Subscription (openai-codex OAuth)
-
-For ChatGPT Plus/Pro subscription via `openai-codex`:
+### OpenAI Codex OAuth flow
 
 - `NULLCLAW_PROVIDER=openai-codex`
 - `OPENAI_CODEX_ACCESS_TOKEN=...`
 - `OPENAI_CODEX_REFRESH_TOKEN=...` (recommended)
-- Optional: `OPENAI_CODEX_EXPIRES_AT=<unix_epoch_seconds>`
-- Optional model: `NULLCLAW_MODEL=gpt-5.3-codex`
+- `OPENAI_CODEX_EXPIRES_AT=<unix_epoch_seconds>` (optional)
 
-This writes `/data/.nullclaw/auth.json` for `openai-codex`.
+## Feature packs
 
-### Telegram (optional)
+### Telegram + audio
 
-Set these env vars to auto-configure Telegram channel on startup:
+- `TELEGRAM_BOT_TOKEN=...`
+- `TELEGRAM_ALLOW_FROM=*` (or CSV allowlist)
+- `TELEGRAM_ACCOUNT_ID=main`
+- `TELEGRAM_GROUP_ALLOW_FROM=...` (optional CSV)
+- `TELEGRAM_GROUP_POLICY=allowlist|open|disabled`
 
-- `TELEGRAM_BOT_TOKEN` (required for Telegram)
-- `TELEGRAM_ALLOW_FROM` (default: `*`; comma-separated usernames or user IDs)
-- `TELEGRAM_ACCOUNT_ID` (default: `main`)
-- `TELEGRAM_GROUP_ALLOW_FROM` (optional, comma-separated)
-- `TELEGRAM_GROUP_POLICY` (default: `allowlist`; allowed: `allowlist`, `open`, `disabled`)
+Audio:
 
-### Telegram Audio Messages (voice notes)
-
-Telegram voice/audio messages are transcribed through `tools.media.audio`.
-Set transcription env vars:
-
-- `NULLCLAW_AUDIO_ENABLED=true` (default: true)
-- `NULLCLAW_AUDIO_PROVIDER=groq` (recommended) or `openai`
-- `NULLCLAW_AUDIO_API_KEY=...` (or provider env key like `GROQ_API_KEY` / `OPENAI_API_KEY`)
+- `NULLCLAW_AUDIO_ENABLED=true`
+- `NULLCLAW_AUDIO_PROVIDER=groq|openai`
+- `NULLCLAW_AUDIO_API_KEY=...` (or provider key env var)
 - Optional: `NULLCLAW_AUDIO_MODEL`, `NULLCLAW_AUDIO_LANGUAGE`, `NULLCLAW_AUDIO_BASE_URL`
 
-If audio key is missing, text chat still works but voice notes are not transcribed.
+### Memory
 
-## 3) (Recommended) add persistent volume
+- `NULLCLAW_MEMORY_BACKEND=sqlite|markdown|postgres|none` (default in this repo: `sqlite`)
+- `NULLCLAW_MEMORY_AUTO_SAVE=true|false`
+- `NULLCLAW_MEMORY_PROFILE=...` (optional)
+- `NULLCLAW_MEMORY_SEARCH_ENABLED=true|false`
+- `NULLCLAW_MEMORY_SEARCH_PROVIDER=none|openai|...`
+- `NULLCLAW_MEMORY_SEARCH_MODEL=text-embedding-3-small` (optional)
+- `NULLCLAW_MEMORY_API_KEY=...` (optional override)
 
-If you want config/workspace to persist across deploys:
+### Web search + HTTP tool
 
-1. Add a Railway volume.
-2. Mount it at `/data`.
+- `NULLCLAW_HTTP_ENABLED=true|false` (default: `true`)
+- `NULLCLAW_WEB_SEARCH_PROVIDER=auto|searxng|duckduckgo|brave|firecrawl|tavily|perplexity|exa|jina`
+- `NULLCLAW_WEB_SEARCH_BASE_URL=https://...` (optional, for SearXNG)
+- `NULLCLAW_WEB_SEARCH_FALLBACK_PROVIDERS=provider1,provider2` (optional CSV)
+- `NULLCLAW_HTTP_ALLOWED_DOMAINS=domain1,domain2` (optional CSV)
 
-`nullclaw` config and workspace are stored under `/data/.nullclaw`.
+Provider API keys (when relevant): `BRAVE_API_KEY`, `FIRECRAWL_API_KEY`, `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`, `EXA_API_KEY`, `JINA_API_KEY`.
 
-## 4) Verify deploy
+### Shell access / autonomy
 
-- Open service URL and check: `GET /health`
-- Check Railway logs for: `nullclaw gateway runtime started`
+- `NULLCLAW_AUTONOMY_LEVEL=supervised|full|...`
+- `NULLCLAW_ALLOWED_COMMANDS=*` (CSV; set `*` for wildcard)
+- `NULLCLAW_ALLOWED_PATHS=*` (CSV; set `*` for wildcard)
+- `NULLCLAW_WORKSPACE_ONLY=true|false`
+- `NULLCLAW_REQUIRE_APPROVAL_FOR_MEDIUM_RISK=true|false`
+- `NULLCLAW_BLOCK_HIGH_RISK_COMMANDS=true|false`
+- Optional tool limits:
+  - `NULLCLAW_SHELL_TIMEOUT_SECS`
+  - `NULLCLAW_SHELL_MAX_OUTPUT_BYTES`
+  - `NULLCLAW_MAX_FILE_SIZE_BYTES`
+  - `NULLCLAW_WEB_FETCH_MAX_CHARS`
+
+### Web relay / browser channel
+
+- `NULLCLAW_WEB_ENABLED=true`
+- `NULLCLAW_WEB_TRANSPORT=local|relay`
+- `NULLCLAW_WEB_LISTEN=127.0.0.1`
+- `NULLCLAW_WEB_PORT=32123`
+- `NULLCLAW_WEB_PATH=/ws`
+- `NULLCLAW_WEB_MESSAGE_AUTH_MODE=pairing|token`
+- `NULLCLAW_WEB_AUTH_TOKEN=...` (optional; also supports `NULLCLAW_WEB_TOKEN` / `NULLCLAW_GATEWAY_TOKEN`)
+- `NULLCLAW_WEB_ALLOWED_ORIGINS=http://localhost:5173,chrome-extension://...`
+
+Relay mode:
+
+- `NULLCLAW_WEB_RELAY_URL=wss://...`
+- `NULLCLAW_WEB_RELAY_AGENT_ID=default`
+- `NULLCLAW_WEB_RELAY_TOKEN=...`
+- `NULLCLAW_WEB_RELAY_TOKEN_TTL_SECS=2592000`
+- `NULLCLAW_WEB_RELAY_PAIRING_CODE_TTL_SECS=300`
+- `NULLCLAW_WEB_RELAY_UI_TOKEN_TTL_SECS=86400`
+- `NULLCLAW_WEB_RELAY_E2E_REQUIRED=true|false`
+
+## Verify deploy
+
+- `GET /health` should return `{"status":"ok"}`
+- Logs should include `nullclaw gateway runtime started`
 
 ## Notes
 
-- This entrypoint only creates config on first boot (or when `NULLCLAW_REWRITE_CONFIG=true`).
-- If you switch providers, set `NULLCLAW_PROVIDER`, corresponding API key variable, and optionally adjust `NULLCLAW_MODEL`.
-- If you add Telegram vars after first deploy, set `NULLCLAW_REWRITE_CONFIG=true` for one deploy so config is regenerated, then set it back to `false`.
+- Config is generated on first boot. Set `NULLCLAW_REWRITE_CONFIG=true` for one deploy when changing env-driven config structure.
+- Runtime image includes `curl`, `git`, `bash`, and `ripgrep` to improve shell/tool usability.

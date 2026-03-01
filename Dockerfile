@@ -3,13 +3,14 @@
 FROM alpine:3.23 AS builder
 
 ARG NULLCLAW_REPO="https://github.com/nullclaw/nullclaw.git"
-ARG NULLCLAW_REF="v2026.2.26"
+ARG NULLCLAW_REF="4101f63"
 
 RUN apk add --no-cache git zig musl-dev
 
 WORKDIR /src
 COPY patches /tmp/patches
-RUN git clone --depth 1 --branch "${NULLCLAW_REF}" "${NULLCLAW_REPO}" nullclaw
+RUN git clone "${NULLCLAW_REPO}" nullclaw \
+    && git -C /src/nullclaw checkout "${NULLCLAW_REF}"
 RUN git -C /src/nullclaw apply /tmp/patches/0001-subagent-wakeup.patch
 
 WORKDIR /src/nullclaw
@@ -32,7 +33,7 @@ RUN set -eu; \
 
 FROM alpine:3.23 AS runtime
 
-RUN apk add --no-cache ca-certificates tzdata curl
+RUN apk add --no-cache ca-certificates tzdata curl git bash ripgrep
 RUN addgroup -S app && adduser -S -G app app
 
 COPY --from=builder /src/nullclaw/zig-out/bin/nullclaw /usr/local/bin/nullclaw

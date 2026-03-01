@@ -1,8 +1,8 @@
 diff --git a/src/daemon.zig b/src/daemon.zig
-index 27a806c..8bdf9a0 100644
+index 3d279d7..eda197f 100644
 --- a/src/daemon.zig
 +++ b/src/daemon.zig
-@@ -565,6 +565,65 @@ fn clearInboundProcessingIndicator(
+@@ -601,6 +601,65 @@ fn clearInboundProcessingIndicator(
      ch.stopTyping(target) catch {};
  }
  
@@ -65,10 +65,10 @@ index 27a806c..8bdf9a0 100644
 +    routes.deinit(allocator);
 +}
 +
- fn inboundDispatcherThread(
+ const StreamingOutboundCtx = struct {
      allocator: std.mem.Allocator,
      event_bus: *bus_mod.Bus,
-@@ -573,6 +632,8 @@ fn inboundDispatcherThread(
+@@ -638,6 +697,8 @@ fn inboundDispatcherThread(
      state: *DaemonState,
  ) void {
      var evict_counter: u32 = 0;
@@ -77,7 +77,7 @@ index 27a806c..8bdf9a0 100644
  
      while (event_bus.consumeInbound()) |msg| {
          defer msg.deinit(allocator);
-@@ -590,19 +651,41 @@ fn inboundDispatcherThread(
+@@ -655,29 +716,51 @@ fn inboundDispatcherThread(
          defer if (routed_session_key) |key| allocator.free(key);
          const session_key = routed_session_key orelse msg.session_key;
  
@@ -124,7 +124,21 @@ index 27a806c..8bdf9a0 100644
              typing_recipient,
          );
  
-@@ -617,10 +700,10 @@ fn inboundDispatcherThread(
+-        const use_streaming_outbound = std.mem.eql(u8, msg.channel, "web");
++        const use_streaming_outbound = std.mem.eql(u8, outbound_channel, "web");
+         var streaming_ctx = StreamingOutboundCtx{
+             .allocator = allocator,
+             .event_bus = event_bus,
+-            .channel = msg.channel,
+-            .account_id = outbound_account_id,
+-            .chat_id = msg.chat_id,
++            .channel = outbound_channel,
++            .account_id = effective_account_id,
++            .chat_id = outbound_chat_id,
+         };
+ 
+         const reply = runtime.session_mgr.processMessageStreaming(
+@@ -702,10 +785,10 @@ fn inboundDispatcherThread(
                  error.OutOfMemory => "Out of memory.",
                  else => "An error occurred. Try again.",
              };
@@ -138,7 +152,7 @@ index 27a806c..8bdf9a0 100644
              event_bus.publishOutbound(err_out) catch {
                  err_out.deinit(allocator);
              };
-@@ -628,10 +711,10 @@ fn inboundDispatcherThread(
+@@ -713,10 +796,10 @@ fn inboundDispatcherThread(
          };
          defer allocator.free(reply);
  
@@ -152,7 +166,7 @@ index 27a806c..8bdf9a0 100644
              log.err("inbound dispatch makeOutbound failed: {}", .{err});
              continue;
          };
-@@ -759,6 +842,11 @@ pub fn run(allocator: std.mem.Allocator, config: *const Config, host: []const u8
+@@ -844,6 +927,11 @@ pub fn run(allocator: std.mem.Allocator, config: *const Config, host: []const u8
          };
      }
      defer if (channel_rt) |rt| rt.deinit();
@@ -165,7 +179,7 @@ index 27a806c..8bdf9a0 100644
      // Spawn channel supervisor thread (only if channels are configured)
      var chan_thread: ?std.Thread = null;
 diff --git a/src/subagent.zig b/src/subagent.zig
-index 7bc0597..811d26e 100644
+index 1d9ab1f..f7ac4d0 100644
 --- a/src/subagent.zig
 +++ b/src/subagent.zig
 @@ -203,6 +203,7 @@ pub const SubagentManager = struct {
