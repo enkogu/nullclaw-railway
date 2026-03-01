@@ -28,6 +28,10 @@ nullclaw gateway --host 0.0.0.0 --port $PORT
 Reference template for full browser + web-search config:
 - `config.browser-web.example.json`
 
+Railway env formatting:
+- Use raw values without quotes in the Railway Variables UI.
+- Example: `NULLCLAW_PROVIDER=anthropic` (not `"anthropic"`).
+
 ## Required env
 
 Use one:
@@ -105,6 +109,26 @@ Provider API keys (when relevant): `BRAVE_API_KEY`, `FIRECRAWL_API_KEY`, `TAVILY
 - `NULLCLAW_BROWSER_NATIVE_CHROME_PATH=/path/to/chrome` (optional)
 - `NULLCLAW_BROWSER_SESSION_NAME=...` (optional)
 - `NULLCLAW_BROWSER_ALLOWED_DOMAINS=example.com,openai.com` (CSV; enables `browser_open` allowlist)
+
+Important:
+- Built-in `browser` tool supports `open` and `read`.
+- `click`/`type`/`scroll` require a CDP-capable backend (not built into this nullclaw version).
+
+### Playwright MCP (Browser Control)
+
+Enable Playwright MCP for interactive browser control in Railway:
+
+- `NULLCLAW_MCP_PLAYWRIGHT_ENABLED=true`
+- `NULLCLAW_MCP_PLAYWRIGHT_COMMAND=npx`
+- `NULLCLAW_MCP_PLAYWRIGHT_PACKAGE=@playwright/mcp`
+- `NULLCLAW_MCP_PLAYWRIGHT_HEADLESS=true`
+- `NULLCLAW_MCP_PLAYWRIGHT_ISOLATED=true`
+- Optional: `NULLCLAW_MCP_PLAYWRIGHT_BROWSER=chrome|firefox|webkit|msedge`
+
+Recommended for Railway (external browser service):
+- `NULLCLAW_MCP_PLAYWRIGHT_CDP_ENDPOINT=wss://<your-cdp-endpoint>`
+- Optional auth header:
+  - `NULLCLAW_MCP_PLAYWRIGHT_CDP_HEADER=Authorization: Bearer <token>`
 
 ### Shell access / autonomy
 
