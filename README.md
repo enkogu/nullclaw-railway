@@ -51,6 +51,16 @@ Use one of:
 - `NULLCLAW_REQUIRE_PAIRING` (default: `false`)
 - `NULLCLAW_REWRITE_CONFIG` (default: `false`)
 
+### Telegram (optional)
+
+Set these env vars to auto-configure Telegram channel on startup:
+
+- `TELEGRAM_BOT_TOKEN` (required for Telegram)
+- `TELEGRAM_ALLOW_FROM` (default: `*`; comma-separated usernames or user IDs)
+- `TELEGRAM_ACCOUNT_ID` (default: `main`)
+- `TELEGRAM_GROUP_ALLOW_FROM` (optional, comma-separated)
+- `TELEGRAM_GROUP_POLICY` (default: `allowlist`; allowed: `allowlist`, `open`, `disabled`)
+
 ## 3) (Recommended) add persistent volume
 
 If you want config/workspace to persist across deploys:
@@ -69,3 +79,4 @@ If you want config/workspace to persist across deploys:
 
 - This entrypoint only creates config on first boot (or when `NULLCLAW_REWRITE_CONFIG=true`).
 - If you switch providers, set `NULLCLAW_PROVIDER`, corresponding API key variable, and optionally adjust `NULLCLAW_MODEL`.
+- If you add Telegram vars after first deploy, set `NULLCLAW_REWRITE_CONFIG=true` for one deploy so config is regenerated, then set it back to `false`.
