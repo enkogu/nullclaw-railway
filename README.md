@@ -144,6 +144,28 @@ Persistence recommendation:
 - Mount a Railway volume at `/data`.
 - Keep `NULLCLAW_MCP_PLAYWRIGHT_USER_DATA_DIR` under `/data` so auth cookies/sessions survive restarts.
 
+### PinchTab Integration (Human + Agent Shared Sessions)
+
+If you want a human to log in once and the agent to reuse that session, run PinchTab as a dedicated browser service and let nullclaw call it via shell/curl.
+
+PinchTab server (separate host/service):
+- `BRIDGE_BIND=0.0.0.0`
+- `BRIDGE_TOKEN=<long-random-token>`
+- `BRIDGE_PROFILE=<profile-name>`
+- Persistent volume for `~/.pinchtab`
+
+nullclaw side:
+- `PINCHTAB_BASE_URL=http://<pinchtab-host>:9867`
+- `PINCHTAB_TOKEN=<same token>`
+- Use helper script: `scripts/pinchtab-client.sh`
+
+Examples:
+- `scripts/pinchtab-client.sh nav https://example.com`
+- `scripts/pinchtab-client.sh snapshot`
+- `scripts/pinchtab-client.sh click e5`
+
+This gives autonomous browser control via PinchTab API while allowing a human login/bootstrap flow outside Railway.
+
 ### Shell access / autonomy
 
 - `NULLCLAW_AUTONOMY_LEVEL=supervised|full|...`
