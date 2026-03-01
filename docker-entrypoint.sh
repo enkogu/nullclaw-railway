@@ -19,7 +19,6 @@ CONFIG_PATH="${CONFIG_DIR}/config.json"
 WORKSPACE_DIR="${NULLCLAW_WORKSPACE:-${CONFIG_DIR}/workspace}"
 
 PROVIDER="${NULLCLAW_PROVIDER:-openrouter}"
-MODEL="${NULLCLAW_MODEL:-anthropic/claude-sonnet-4.6}"
 HOST="${NULLCLAW_GATEWAY_HOST:-0.0.0.0}"
 PORT="${PORT:-3000}"
 
@@ -27,8 +26,36 @@ ALLOW_PUBLIC_BIND_JSON="$(to_json_bool "${NULLCLAW_ALLOW_PUBLIC_BIND:-true}")"
 REQUIRE_PAIRING_JSON="$(to_json_bool "${NULLCLAW_REQUIRE_PAIRING:-false}")"
 REWRITE_CONFIG="$(to_json_bool "${NULLCLAW_REWRITE_CONFIG:-false}")"
 
-# Use generic key first, then default OpenRouter variable as fallback.
-API_KEY="${NULLCLAW_API_KEY:-${OPENROUTER_API_KEY:-}}"
+provider_key=""
+provider_lc="$(printf '%s' "$PROVIDER" | tr '[:upper:]' '[:lower:]')"
+case "$provider_lc" in
+  openai) provider_key="${OPENAI_API_KEY:-}" ;;
+  anthropic) provider_key="${ANTHROPIC_API_KEY:-}" ;;
+  openrouter) provider_key="${OPENROUTER_API_KEY:-}" ;;
+  gemini) provider_key="${GEMINI_API_KEY:-}" ;;
+  groq) provider_key="${GROQ_API_KEY:-}" ;;
+  xai|grok) provider_key="${XAI_API_KEY:-}" ;;
+  deepseek) provider_key="${DEEPSEEK_API_KEY:-}" ;;
+  cohere) provider_key="${COHERE_API_KEY:-}" ;;
+  mistral) provider_key="${MISTRAL_API_KEY:-}" ;;
+  perplexity) provider_key="${PERPLEXITY_API_KEY:-}" ;;
+  together-ai|together) provider_key="${TOGETHER_API_KEY:-}" ;;
+esac
+
+# Preferred: NULLCLAW_API_KEY. Fallback: provider-specific key env var.
+# Final fallback checks common vars in case provider/env names are mismatched.
+API_KEY="${NULLCLAW_API_KEY:-${provider_key:-${OPENROUTER_API_KEY:-${OPENAI_API_KEY:-${ANTHROPIC_API_KEY:-}}}}}"
+
+MODEL="${NULLCLAW_MODEL:-}"
+if [ -z "$MODEL" ]; then
+  case "$provider_lc" in
+    openai) MODEL="gpt-5.2" ;;
+    anthropic) MODEL="claude-opus-4-6" ;;
+    openrouter) MODEL="anthropic/claude-sonnet-4.6" ;;
+    gemini) MODEL="gemini-2.5-pro" ;;
+    *) MODEL="anthropic/claude-sonnet-4.6" ;;
+  esac
+fi
 
 if [ "${MODEL#${PROVIDER}/}" != "$MODEL" ]; then
   PRIMARY_MODEL="$MODEL"
@@ -40,7 +67,7 @@ mkdir -p "$CONFIG_DIR" "$WORKSPACE_DIR"
 
 if [ ! -f "$CONFIG_PATH" ] || [ "$REWRITE_CONFIG" = "true" ]; then
   if [ -z "$API_KEY" ]; then
-    echo "ERROR: Missing API key. Set NULLCLAW_API_KEY (or OPENROUTER_API_KEY)." >&2
+    echo "ERROR: Missing API key. Set NULLCLAW_API_KEY or provider key env (e.g. OPENAI_API_KEY / ANTHROPIC_API_KEY / OPENROUTER_API_KEY)." >&2
     exit 1
   fi
 
@@ -77,4 +104,5 @@ fi
 export HOME="$NULLCLAW_HOME"
 export NULLCLAW_WORKSPACE="$WORKSPACE_DIR"
 
+echo "Starting nullclaw gateway on ${HOST}:${PORT} with provider=${PROVIDER} model=${PRIMARY_MODEL}"
 exec nullclaw gateway --host "$HOST" --port "$PORT"

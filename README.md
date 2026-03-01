@@ -30,16 +30,22 @@ git push -u origin main
 1. In Railway, click **New Project** -> **Deploy from GitHub repo**.
 2. Select this repository.
 3. Railway will build from `Dockerfile` automatically.
-4. Add environment variables (minimum: `NULLCLAW_API_KEY`).
+4. Add environment variables (minimum: one API key variable).
 
 ### Required environment variable
 
-- `NULLCLAW_API_KEY`: your provider key (for default provider `openrouter`, OpenRouter key works)
+Use one of:
+
+- `NULLCLAW_API_KEY` (works for any selected provider), or
+- provider-specific key var matching `NULLCLAW_PROVIDER`:
+  - `OPENROUTER_API_KEY`
+  - `OPENAI_API_KEY`
+  - `ANTHROPIC_API_KEY`
 
 ### Optional environment variables
 
 - `NULLCLAW_PROVIDER` (default: `openrouter`)
-- `NULLCLAW_MODEL` (default: `anthropic/claude-sonnet-4.6`)
+- `NULLCLAW_MODEL` (optional; defaults are provider-specific)
 - `NULLCLAW_GATEWAY_HOST` (default: `0.0.0.0`)
 - `NULLCLAW_ALLOW_PUBLIC_BIND` (default: `true`)
 - `NULLCLAW_REQUIRE_PAIRING` (default: `false`)
@@ -62,4 +68,4 @@ If you want config/workspace to persist across deploys:
 ## Notes
 
 - This entrypoint only creates config on first boot (or when `NULLCLAW_REWRITE_CONFIG=true`).
-- If you switch providers, set both `NULLCLAW_PROVIDER` and `NULLCLAW_API_KEY`, and optionally adjust `NULLCLAW_MODEL`.
+- If you switch providers, set `NULLCLAW_PROVIDER`, corresponding API key variable, and optionally adjust `NULLCLAW_MODEL`.
