@@ -30,7 +30,7 @@ RUN set -eu; \
 
 FROM alpine:3.23 AS runtime
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata curl
 RUN addgroup -S app && adduser -S -G app app
 
 COPY --from=builder /src/nullclaw/zig-out/bin/nullclaw /usr/local/bin/nullclaw
