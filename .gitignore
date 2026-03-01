@@ -1,0 +1,8 @@
+# Local runtime data
+.data/
+
+# macOS
+.DS_Store
+
+# Temporary upstream clone used during setup
+upstream-nullclaw/
