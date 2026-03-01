@@ -133,6 +133,7 @@ Enable Playwright MCP for interactive browser control in Railway:
 - Optional: `NULLCLAW_MCP_PLAYWRIGHT_OUTPUT_DIR=/data/.nullclaw/playwright-output`
 - Optional: `NULLCLAW_MCP_PLAYWRIGHT_SAVE_SESSION=true`
 - Optional: `NULLCLAW_MCP_PLAYWRIGHT_SHARED_BROWSER_CONTEXT=true`
+- Optional: `NULLCLAW_MCP_PLAYWRIGHT_NO_SANDBOX=true` (needed if container runs as root)
 
 Recommended for Railway (external browser service):
 - `NULLCLAW_MCP_PLAYWRIGHT_CDP_ENDPOINT=wss://<your-cdp-endpoint>`
