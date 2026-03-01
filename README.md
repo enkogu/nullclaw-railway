@@ -56,6 +56,10 @@ Common:
 - `NULLCLAW_PROVIDER=anthropic`
 - `ANTHROPIC_OAUTH_TOKEN=sk-ant-oat01-...`
 
+Notes:
+- `sk-ant-oat01-...` OAuth tokens can work with nullclaw Anthropic provider.
+- Token validity is quota/rate-limit dependent; if you hit `error.RateLimited`, refresh token or use fallback providers.
+
 ### OpenAI Codex OAuth flow
 
 - `NULLCLAW_PROVIDER=openai-codex`
@@ -122,13 +126,22 @@ Enable Playwright MCP for interactive browser control in Railway:
 - `NULLCLAW_MCP_PLAYWRIGHT_COMMAND=npx`
 - `NULLCLAW_MCP_PLAYWRIGHT_PACKAGE=@playwright/mcp`
 - `NULLCLAW_MCP_PLAYWRIGHT_HEADLESS=true`
-- `NULLCLAW_MCP_PLAYWRIGHT_ISOLATED=true`
+- `NULLCLAW_MCP_PLAYWRIGHT_ISOLATED=false` (for persistent login sessions)
 - Optional: `NULLCLAW_MCP_PLAYWRIGHT_BROWSER=chrome|firefox|webkit|msedge`
+- Optional: `NULLCLAW_MCP_PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium-browser`
+- Optional: `NULLCLAW_MCP_PLAYWRIGHT_USER_DATA_DIR=/data/.nullclaw/playwright-profile`
+- Optional: `NULLCLAW_MCP_PLAYWRIGHT_OUTPUT_DIR=/data/.nullclaw/playwright-output`
+- Optional: `NULLCLAW_MCP_PLAYWRIGHT_SAVE_SESSION=true`
+- Optional: `NULLCLAW_MCP_PLAYWRIGHT_SHARED_BROWSER_CONTEXT=true`
 
 Recommended for Railway (external browser service):
 - `NULLCLAW_MCP_PLAYWRIGHT_CDP_ENDPOINT=wss://<your-cdp-endpoint>`
 - Optional auth header:
   - `NULLCLAW_MCP_PLAYWRIGHT_CDP_HEADER=Authorization: Bearer <token>`
+
+Persistence recommendation:
+- Mount a Railway volume at `/data`.
+- Keep `NULLCLAW_MCP_PLAYWRIGHT_USER_DATA_DIR` under `/data` so auth cookies/sessions survive restarts.
 
 ### Shell access / autonomy
 
@@ -143,6 +156,17 @@ Recommended for Railway (external browser service):
   - `NULLCLAW_SHELL_MAX_OUTPUT_BYTES`
   - `NULLCLAW_MAX_FILE_SIZE_BYTES`
   - `NULLCLAW_WEB_FETCH_MAX_CHARS`
+
+### Provider reliability / fallback
+
+- `NULLCLAW_RELIABILITY_PROVIDER_RETRIES=2`
+- `NULLCLAW_RELIABILITY_PROVIDER_BACKOFF_MS=500`
+- `NULLCLAW_RELIABILITY_FALLBACK_PROVIDERS=openrouter,groq` (CSV provider names configured in `models.providers`)
+- `NULLCLAW_RELIABILITY_API_KEYS=...` (optional CSV key rotation for primary provider)
+- `NULLCLAW_RELIABILITY_MODEL_FALLBACK_SOURCE=claude-sonnet-4-6`
+- `NULLCLAW_RELIABILITY_MODEL_FALLBACKS=groq/llama-3.3-70b-versatile` (CSV)
+
+Use this when Anthropic/OpenAI temporarily rate-limit requests.
 
 ### Web relay / browser channel
 
@@ -165,6 +189,8 @@ Relay mode:
 - `NULLCLAW_WEB_RELAY_UI_TOKEN_TTL_SECS=86400`
 - `NULLCLAW_WEB_RELAY_E2E_REQUIRED=true|false`
 
+If relay URL/token are left as placeholders, this entrypoint auto-disables the web relay channel to avoid restart loops.
+
 ## Verify deploy
 
 - `GET /health` should return `{"status":"ok"}`
@@ -173,4 +199,4 @@ Relay mode:
 ## Notes
 
 - Config is generated on first boot. Set `NULLCLAW_REWRITE_CONFIG=true` for one deploy when changing env-driven config structure.
-- Runtime image includes `curl`, `git`, `bash`, and `ripgrep` to improve shell/tool usability.
+- Runtime image includes `curl`, `git`, `bash`, `ripgrep`, `nodejs/npm`, and `chromium` for shell + Playwright browser automation.

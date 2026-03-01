@@ -33,7 +33,9 @@ RUN set -eu; \
 
 FROM alpine:3.23 AS runtime
 
-RUN apk add --no-cache ca-certificates tzdata curl git bash ripgrep nodejs npm
+RUN apk add --no-cache \
+    ca-certificates tzdata curl git bash ripgrep nodejs npm \
+    chromium nss freetype harfbuzz ttf-freefont
 RUN addgroup -S app && adduser -S -G app app
 
 COPY --from=builder /src/nullclaw/zig-out/bin/nullclaw /usr/local/bin/nullclaw

@@ -96,7 +96,7 @@ index 3d279d7..eda197f 100644
 +        var outbound_chat_id = msg.chat_id;
 +        var effective_account_id = outbound_account_id;
 +        if (std.mem.eql(u8, msg.channel, "agent")) {
-+            if (session_reply_routes.get(msg.chat_id)) |route| {
++            if (session_reply_routes.get(session_key)) |route| {
 +                outbound_channel = route.channel;
 +                outbound_chat_id = route.chat_id;
 +                effective_account_id = route.account_id;
