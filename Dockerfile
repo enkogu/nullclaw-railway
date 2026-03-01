@@ -8,7 +8,9 @@ ARG NULLCLAW_REF="v2026.2.26"
 RUN apk add --no-cache git zig musl-dev
 
 WORKDIR /src
+COPY patches /tmp/patches
 RUN git clone --depth 1 --branch "${NULLCLAW_REF}" "${NULLCLAW_REPO}" nullclaw
+RUN git -C /src/nullclaw apply /tmp/patches/0001-subagent-wakeup.patch
 
 WORKDIR /src/nullclaw
 ARG TARGETARCH

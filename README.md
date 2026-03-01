@@ -12,6 +12,7 @@ nullclaw gateway --host 0.0.0.0 --port $PORT
 
 - Upstream source: `https://github.com/nullclaw/nullclaw`
 - Default pinned ref: `v2026.2.26` (change via Docker build arg `NULLCLAW_REF`)
+- Applies local patch: `patches/0001-subagent-wakeup.patch` (subagent completion wakes main session and routes reply back to originating chat)
 - HTTP health endpoint: `/health`
 
 ## 1) Push this repo to GitHub
