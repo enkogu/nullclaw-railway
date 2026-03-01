@@ -33,6 +33,25 @@ csv_to_json_array() {
   '
 }
 
+provider_key_for_name() {
+  provider_name_lc="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$provider_name_lc" in
+    openai) printf '%s' "${OPENAI_API_KEY:-}" ;;
+    anthropic) printf '%s' "${ANTHROPIC_OAUTH_TOKEN:-${ANTHROPIC_API_KEY:-}}" ;;
+    openrouter) printf '%s' "${OPENROUTER_API_KEY:-}" ;;
+    openai-codex) printf '' ;;
+    gemini) printf '%s' "${GEMINI_API_KEY:-}" ;;
+    groq) printf '%s' "${GROQ_API_KEY:-}" ;;
+    xai|grok) printf '%s' "${XAI_API_KEY:-}" ;;
+    deepseek) printf '%s' "${DEEPSEEK_API_KEY:-}" ;;
+    cohere) printf '%s' "${COHERE_API_KEY:-}" ;;
+    mistral) printf '%s' "${MISTRAL_API_KEY:-}" ;;
+    perplexity) printf '%s' "${PERPLEXITY_API_KEY:-}" ;;
+    together-ai|together) printf '%s' "${TOGETHER_API_KEY:-}" ;;
+    *) printf '' ;;
+  esac
+}
+
 NULLCLAW_HOME="${NULLCLAW_HOME:-/data}"
 CONFIG_DIR="${NULLCLAW_HOME}/.nullclaw"
 CONFIG_PATH="${CONFIG_DIR}/config.json"
@@ -55,27 +74,22 @@ OPENAI_CODEX_ACCESS_TOKEN="${OPENAI_CODEX_ACCESS_TOKEN:-}"
 OPENAI_CODEX_REFRESH_TOKEN="${OPENAI_CODEX_REFRESH_TOKEN:-}"
 OPENAI_CODEX_EXPIRES_AT="${OPENAI_CODEX_EXPIRES_AT:-0}"
 OPENAI_CODEX_TOKEN_TYPE="${OPENAI_CODEX_TOKEN_TYPE:-Bearer}"
+NULLCLAW_AUDIO_ENABLED_JSON="$(to_json_bool "${NULLCLAW_AUDIO_ENABLED:-true}")"
+NULLCLAW_AUDIO_PROVIDER="${NULLCLAW_AUDIO_PROVIDER:-groq}"
+NULLCLAW_AUDIO_MODEL="${NULLCLAW_AUDIO_MODEL:-whisper-large-v3}"
+NULLCLAW_AUDIO_LANGUAGE="${NULLCLAW_AUDIO_LANGUAGE:-}"
+NULLCLAW_AUDIO_BASE_URL="${NULLCLAW_AUDIO_BASE_URL:-}"
+NULLCLAW_AUDIO_API_KEY="${NULLCLAW_AUDIO_API_KEY:-}"
 
-provider_key=""
 provider_lc="$(printf '%s' "$PROVIDER" | tr '[:upper:]' '[:lower:]')"
-case "$provider_lc" in
-  openai) provider_key="${OPENAI_API_KEY:-}" ;;
-  anthropic) provider_key="${ANTHROPIC_OAUTH_TOKEN:-${ANTHROPIC_API_KEY:-}}" ;;
-  openrouter) provider_key="${OPENROUTER_API_KEY:-}" ;;
-  openai-codex) provider_key="" ;;
-  gemini) provider_key="${GEMINI_API_KEY:-}" ;;
-  groq) provider_key="${GROQ_API_KEY:-}" ;;
-  xai|grok) provider_key="${XAI_API_KEY:-}" ;;
-  deepseek) provider_key="${DEEPSEEK_API_KEY:-}" ;;
-  cohere) provider_key="${COHERE_API_KEY:-}" ;;
-  mistral) provider_key="${MISTRAL_API_KEY:-}" ;;
-  perplexity) provider_key="${PERPLEXITY_API_KEY:-}" ;;
-  together-ai|together) provider_key="${TOGETHER_API_KEY:-}" ;;
-esac
+provider_key="$(provider_key_for_name "$PROVIDER")"
 
 # Preferred: NULLCLAW_API_KEY. Fallback: provider-specific key env var.
 # Final fallback checks common vars in case provider/env names are mismatched.
 API_KEY="${NULLCLAW_API_KEY:-${provider_key:-${OPENROUTER_API_KEY:-${OPENAI_API_KEY:-${ANTHROPIC_OAUTH_TOKEN:-${ANTHROPIC_API_KEY:-}}}}}}"
+AUDIO_PROVIDER_LC="$(printf '%s' "$NULLCLAW_AUDIO_PROVIDER" | tr '[:upper:]' '[:lower:]')"
+AUDIO_PROVIDER_KEY="$(provider_key_for_name "$NULLCLAW_AUDIO_PROVIDER")"
+AUDIO_API_KEY="${NULLCLAW_AUDIO_API_KEY:-$AUDIO_PROVIDER_KEY}"
 
 MODEL="${NULLCLAW_MODEL:-}"
 if [ -z "$MODEL" ]; then
@@ -148,6 +162,47 @@ if [ ! -f "$CONFIG_PATH" ] || [ "$REWRITE_CONFIG" = "true" ]; then
     PROVIDER_CONFIG_BLOCK="\"$PROVIDER_ESC\": { \"api_key\": \"$API_KEY_ESC\" }"
   fi
 
+  TOOLS_BLOCK=""
+  if [ "$NULLCLAW_AUDIO_ENABLED_JSON" = "true" ]; then
+    AUDIO_PROVIDER_ESC="$(json_escape "$NULLCLAW_AUDIO_PROVIDER")"
+    AUDIO_MODEL_ESC="$(json_escape "$NULLCLAW_AUDIO_MODEL")"
+
+    if [ -n "$AUDIO_API_KEY" ]; then
+      AUDIO_API_KEY_ESC="$(json_escape "$AUDIO_API_KEY")"
+      if [ "$AUDIO_PROVIDER_LC" != "$provider_lc" ] || [ "$IS_OAUTH_PROVIDER" = "true" ]; then
+        PROVIDER_CONFIG_BLOCK="$PROVIDER_CONFIG_BLOCK,
+      \"$AUDIO_PROVIDER_ESC\": { \"api_key\": \"$AUDIO_API_KEY_ESC\" }"
+      fi
+    else
+      echo "WARN: NULLCLAW_AUDIO_ENABLED=true but no key found for audio provider '$NULLCLAW_AUDIO_PROVIDER'; voice messages will not be transcribed." >&2
+    fi
+
+    AUDIO_MODEL_FIELDS="\"provider\": \"$AUDIO_PROVIDER_ESC\", \"model\": \"$AUDIO_MODEL_ESC\""
+    if [ -n "$NULLCLAW_AUDIO_BASE_URL" ]; then
+      AUDIO_BASE_URL_ESC="$(json_escape "$NULLCLAW_AUDIO_BASE_URL")"
+      AUDIO_MODEL_FIELDS="$AUDIO_MODEL_FIELDS, \"base_url\": \"$AUDIO_BASE_URL_ESC\""
+    fi
+    if [ -n "$NULLCLAW_AUDIO_LANGUAGE" ]; then
+      AUDIO_LANGUAGE_ESC="$(json_escape "$NULLCLAW_AUDIO_LANGUAGE")"
+      AUDIO_LANGUAGE_FIELD=", \"language\": \"$AUDIO_LANGUAGE_ESC\""
+    else
+      AUDIO_LANGUAGE_FIELD=""
+    fi
+
+    TOOLS_BLOCK=$(cat <<EOF_TOOLS
+,
+  "tools": {
+    "media": {
+      "audio": {
+        "enabled": true$AUDIO_LANGUAGE_FIELD,
+        "models": [{$AUDIO_MODEL_FIELDS}]
+      }
+    }
+  }
+EOF_TOOLS
+)
+  fi
+
   CHANNELS_BLOCK=""
   if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
     TELEGRAM_BOT_TOKEN_ESC="$(json_escape "$TELEGRAM_BOT_TOKEN")"
@@ -186,7 +241,7 @@ EOF_CHANNELS
     "defaults": {
       "model": { "primary": "$PRIMARY_MODEL_ESC" }
     }
-  },
+  }$TOOLS_BLOCK,
   "gateway": {
     "port": $PORT,
     "host": "$HOST_ESC",

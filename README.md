@@ -84,6 +84,18 @@ Set these env vars to auto-configure Telegram channel on startup:
 - `TELEGRAM_GROUP_ALLOW_FROM` (optional, comma-separated)
 - `TELEGRAM_GROUP_POLICY` (default: `allowlist`; allowed: `allowlist`, `open`, `disabled`)
 
+### Telegram Audio Messages (voice notes)
+
+Telegram voice/audio messages are transcribed through `tools.media.audio`.
+Set transcription env vars:
+
+- `NULLCLAW_AUDIO_ENABLED=true` (default: true)
+- `NULLCLAW_AUDIO_PROVIDER=groq` (recommended) or `openai`
+- `NULLCLAW_AUDIO_API_KEY=...` (or provider env key like `GROQ_API_KEY` / `OPENAI_API_KEY`)
+- Optional: `NULLCLAW_AUDIO_MODEL`, `NULLCLAW_AUDIO_LANGUAGE`, `NULLCLAW_AUDIO_BASE_URL`
+
+If audio key is missing, text chat still works but voice notes are not transcribed.
+
 ## 3) (Recommended) add persistent volume
 
 If you want config/workspace to persist across deploys:
