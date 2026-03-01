@@ -15,6 +15,7 @@ nullclaw gateway --host 0.0.0.0 --port $PORT
 - Applies local patch: `patches/0001-subagent-wakeup.patch`
   - subagent completion wakes the main session
   - reply is routed back to the original channel/chat (including Telegram)
+  - subagent execution uses the provider runtime stack (fixes `ProviderError` on Anthropic-style providers)
 - Health endpoint: `/health`
 
 ## Deploy on Railway
@@ -23,6 +24,9 @@ nullclaw gateway --host 0.0.0.0 --port $PORT
 2. Add environment variables (see below).
 3. Deploy.
 4. Optional but recommended: mount a volume at `/data`.
+
+Reference template for full browser + web-search config:
+- `config.browser-web.example.json`
 
 ## Required env
 
@@ -91,6 +95,16 @@ Audio:
 - `NULLCLAW_HTTP_ALLOWED_DOMAINS=domain1,domain2` (optional CSV)
 
 Provider API keys (when relevant): `BRAVE_API_KEY`, `FIRECRAWL_API_KEY`, `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`, `EXA_API_KEY`, `JINA_API_KEY`.
+
+### Browser tool
+
+- `NULLCLAW_BROWSER_ENABLED=true|false`
+- `NULLCLAW_BROWSER_BACKEND=agent_browser|...`
+- `NULLCLAW_BROWSER_NATIVE_HEADLESS=true|false`
+- `NULLCLAW_BROWSER_NATIVE_WEBDRIVER_URL=http://127.0.0.1:9515`
+- `NULLCLAW_BROWSER_NATIVE_CHROME_PATH=/path/to/chrome` (optional)
+- `NULLCLAW_BROWSER_SESSION_NAME=...` (optional)
+- `NULLCLAW_BROWSER_ALLOWED_DOMAINS=example.com,openai.com` (CSV; enables `browser_open` allowlist)
 
 ### Shell access / autonomy
 

@@ -1,5 +1,6 @@
 # Local runtime data
 .data/
+.env
 
 # macOS
 .DS_Store
