@@ -40,6 +40,7 @@ Use one of:
 - provider-specific key var matching `NULLCLAW_PROVIDER`:
   - `OPENROUTER_API_KEY`
   - `OPENAI_API_KEY`
+  - `ANTHROPIC_OAUTH_TOKEN` (Claude subscription/setup token)
   - `ANTHROPIC_API_KEY`
 
 ### Optional environment variables
@@ -50,6 +51,28 @@ Use one of:
 - `NULLCLAW_ALLOW_PUBLIC_BIND` (default: `true`)
 - `NULLCLAW_REQUIRE_PAIRING` (default: `false`)
 - `NULLCLAW_REWRITE_CONFIG` (default: `false`)
+
+### Claude Subscription (Anthropic OAuth token)
+
+For Claude Code subscription/setup tokens (`sk-ant-oat01-...`):
+
+- `NULLCLAW_PROVIDER=anthropic`
+- `ANTHROPIC_OAUTH_TOKEN=sk-ant-oat01-...`
+- Optional model: `NULLCLAW_MODEL=claude-sonnet-4-6`
+
+The image supports this directly.
+
+### OpenAI Subscription (openai-codex OAuth)
+
+For ChatGPT Plus/Pro subscription via `openai-codex`:
+
+- `NULLCLAW_PROVIDER=openai-codex`
+- `OPENAI_CODEX_ACCESS_TOKEN=...`
+- `OPENAI_CODEX_REFRESH_TOKEN=...` (recommended)
+- Optional: `OPENAI_CODEX_EXPIRES_AT=<unix_epoch_seconds>`
+- Optional model: `NULLCLAW_MODEL=gpt-5.3-codex`
+
+This writes `/data/.nullclaw/auth.json` for `openai-codex`.
 
 ### Telegram (optional)
 

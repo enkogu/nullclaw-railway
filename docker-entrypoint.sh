@@ -51,13 +51,18 @@ TELEGRAM_ACCOUNT_ID="${TELEGRAM_ACCOUNT_ID:-main}"
 TELEGRAM_ALLOW_FROM_CSV="${TELEGRAM_ALLOW_FROM:-*}"
 TELEGRAM_GROUP_ALLOW_FROM_CSV="${TELEGRAM_GROUP_ALLOW_FROM:-}"
 TELEGRAM_GROUP_POLICY="${TELEGRAM_GROUP_POLICY:-allowlist}"
+OPENAI_CODEX_ACCESS_TOKEN="${OPENAI_CODEX_ACCESS_TOKEN:-}"
+OPENAI_CODEX_REFRESH_TOKEN="${OPENAI_CODEX_REFRESH_TOKEN:-}"
+OPENAI_CODEX_EXPIRES_AT="${OPENAI_CODEX_EXPIRES_AT:-0}"
+OPENAI_CODEX_TOKEN_TYPE="${OPENAI_CODEX_TOKEN_TYPE:-Bearer}"
 
 provider_key=""
 provider_lc="$(printf '%s' "$PROVIDER" | tr '[:upper:]' '[:lower:]')"
 case "$provider_lc" in
   openai) provider_key="${OPENAI_API_KEY:-}" ;;
-  anthropic) provider_key="${ANTHROPIC_API_KEY:-}" ;;
+  anthropic) provider_key="${ANTHROPIC_OAUTH_TOKEN:-${ANTHROPIC_API_KEY:-}}" ;;
   openrouter) provider_key="${OPENROUTER_API_KEY:-}" ;;
+  openai-codex) provider_key="" ;;
   gemini) provider_key="${GEMINI_API_KEY:-}" ;;
   groq) provider_key="${GROQ_API_KEY:-}" ;;
   xai|grok) provider_key="${XAI_API_KEY:-}" ;;
@@ -70,7 +75,7 @@ esac
 
 # Preferred: NULLCLAW_API_KEY. Fallback: provider-specific key env var.
 # Final fallback checks common vars in case provider/env names are mismatched.
-API_KEY="${NULLCLAW_API_KEY:-${provider_key:-${OPENROUTER_API_KEY:-${OPENAI_API_KEY:-${ANTHROPIC_API_KEY:-}}}}}"
+API_KEY="${NULLCLAW_API_KEY:-${provider_key:-${OPENROUTER_API_KEY:-${OPENAI_API_KEY:-${ANTHROPIC_OAUTH_TOKEN:-${ANTHROPIC_API_KEY:-}}}}}}"
 
 MODEL="${NULLCLAW_MODEL:-}"
 if [ -z "$MODEL" ]; then
@@ -78,9 +83,46 @@ if [ -z "$MODEL" ]; then
     openai) MODEL="gpt-5.2" ;;
     anthropic) MODEL="claude-opus-4-6" ;;
     openrouter) MODEL="anthropic/claude-sonnet-4.6" ;;
+    openai-codex) MODEL="gpt-5.3-codex" ;;
     gemini) MODEL="gemini-2.5-pro" ;;
     *) MODEL="anthropic/claude-sonnet-4.6" ;;
   esac
+fi
+
+mkdir -p "$CONFIG_DIR" "$WORKSPACE_DIR"
+
+AUTH_PATH="${CONFIG_DIR}/auth.json"
+IS_OAUTH_PROVIDER=false
+if [ "$provider_lc" = "openai-codex" ]; then
+  IS_OAUTH_PROVIDER=true
+fi
+
+if [ "$IS_OAUTH_PROVIDER" = "true" ]; then
+  if [ -n "$OPENAI_CODEX_ACCESS_TOKEN" ]; then
+    case "$OPENAI_CODEX_EXPIRES_AT" in
+      ''|*[!0-9-]*) OPENAI_CODEX_EXPIRES_AT=0 ;;
+    esac
+    ACCESS_ESC="$(json_escape "$OPENAI_CODEX_ACCESS_TOKEN")"
+    REFRESH_ESC="$(json_escape "$OPENAI_CODEX_REFRESH_TOKEN")"
+    TOKEN_TYPE_ESC="$(json_escape "$OPENAI_CODEX_TOKEN_TYPE")"
+    if [ -n "$OPENAI_CODEX_REFRESH_TOKEN" ]; then
+      REFRESH_FIELD=", \"refresh_token\": \"$REFRESH_ESC\""
+    else
+      REFRESH_FIELD=""
+    fi
+    cat > "$AUTH_PATH" <<EOF_AUTH
+{
+  "openai-codex": {
+    "access_token": "$ACCESS_ESC"$REFRESH_FIELD,
+    "expires_at": $OPENAI_CODEX_EXPIRES_AT,
+    "token_type": "$TOKEN_TYPE_ESC"
+  }
+}
+EOF_AUTH
+  elif [ ! -f "$AUTH_PATH" ]; then
+    echo "ERROR: Missing OpenAI subscription credentials. Set OPENAI_CODEX_ACCESS_TOKEN (and OPENAI_CODEX_REFRESH_TOKEN) or provide /data/.nullclaw/auth.json." >&2
+    exit 1
+  fi
 fi
 
 if [ "${MODEL#${PROVIDER}/}" != "$MODEL" ]; then
@@ -89,19 +131,22 @@ else
   PRIMARY_MODEL="${PROVIDER}/${MODEL}"
 fi
 
-mkdir -p "$CONFIG_DIR" "$WORKSPACE_DIR"
-
 if [ ! -f "$CONFIG_PATH" ] || [ "$REWRITE_CONFIG" = "true" ]; then
-  if [ -z "$API_KEY" ]; then
-    echo "ERROR: Missing API key. Set NULLCLAW_API_KEY or provider key env (e.g. OPENAI_API_KEY / ANTHROPIC_API_KEY / OPENROUTER_API_KEY)." >&2
+  if [ "$IS_OAUTH_PROVIDER" != "true" ] && [ -z "$API_KEY" ]; then
+    echo "ERROR: Missing API key/token. Set NULLCLAW_API_KEY or provider key env (e.g. OPENAI_API_KEY / ANTHROPIC_OAUTH_TOKEN / ANTHROPIC_API_KEY / OPENROUTER_API_KEY)." >&2
     exit 1
   fi
 
-  API_KEY_ESC="$(json_escape "$API_KEY")"
   PROVIDER_ESC="$(json_escape "$PROVIDER")"
   PRIMARY_MODEL_ESC="$(json_escape "$PRIMARY_MODEL")"
   WORKSPACE_ESC="$(json_escape "$WORKSPACE_DIR")"
   HOST_ESC="$(json_escape "$HOST")"
+  if [ "$IS_OAUTH_PROVIDER" = "true" ]; then
+    PROVIDER_CONFIG_BLOCK="\"$PROVIDER_ESC\": {}"
+  else
+    API_KEY_ESC="$(json_escape "$API_KEY")"
+    PROVIDER_CONFIG_BLOCK="\"$PROVIDER_ESC\": { \"api_key\": \"$API_KEY_ESC\" }"
+  fi
 
   CHANNELS_BLOCK=""
   if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
@@ -134,7 +179,7 @@ EOF_CHANNELS
   "default_temperature": 0.7,
   "models": {
     "providers": {
-      "$PROVIDER_ESC": { "api_key": "$API_KEY_ESC" }
+      $PROVIDER_CONFIG_BLOCK
     }
   },
   "agents": {
