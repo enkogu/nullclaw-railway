@@ -1,0 +1,35 @@
+diff --git a/src/tools/http_request.zig b/src/tools/http_request.zig
+index 694ad28..8a09c6c 100644
+--- a/src/tools/http_request.zig
++++ b/src/tools/http_request.zig
+@@ -52,8 +52,12 @@ pub const HttpRequestTool = struct {
+         // resolve once, validate global address, and connect directly to it.
+         const host = net_security.extractHost(url) orelse
+             return ToolResult.fail("Invalid URL: cannot extract host");
++        const allow_private_hosts = envBoolEnabled("NULLCLAW_HTTP_ALLOW_PRIVATE_HOSTS");
+         const connect_host = net_security.resolveConnectHost(allocator, host, resolved_port) catch |err| switch (err) {
+-            error.LocalAddressBlocked => return ToolResult.fail("Blocked local/private host"),
++            error.LocalAddressBlocked => if (allow_private_hosts)
++                try allocator.dupe(u8, stripHostBrackets(host))
++            else
++                return ToolResult.fail("Blocked local/private host"),
+             else => return ToolResult.fail("Unable to verify host safety"),
+         };
+         defer allocator.free(connect_host);
+@@ -200,6 +204,16 @@ pub const HttpRequestTool = struct {
+     }
+ };
+ 
++fn envBoolEnabled(name: []const u8) bool {
++    const value = std.process.getEnvVarOwned(std.heap.page_allocator, name) catch return false;
++    defer std.heap.page_allocator.free(value);
++
++    return std.ascii.eqlIgnoreCase(value, "1") or
++        std.ascii.eqlIgnoreCase(value, "true") or
++        std.ascii.eqlIgnoreCase(value, "yes") or
++        std.ascii.eqlIgnoreCase(value, "on");
++}
++
+ fn validateMethod(method: []const u8) ?std.http.Method {
+     if (std.ascii.eqlIgnoreCase(method, "GET")) return .GET;
+     if (std.ascii.eqlIgnoreCase(method, "POST")) return .POST;

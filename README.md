@@ -20,6 +20,8 @@ nullclaw gateway --host 0.0.0.0 --port $PORT
   - `patches/0002-prune-tool-result-history.patch`
     - prunes internal `<tool_call>/<tool_result>` scaffolding from persisted chat history after each turn
     - prevents stale previous-turn tool errors from being re-interpreted as fresh failures in the next turn
+  - `patches/0003-http-request-allow-private-hosts.patch`
+    - allows private/local targets in `http_request` when `NULLCLAW_HTTP_ALLOW_PRIVATE_HOSTS=true` (enabled by default in this build)
 - Health endpoint: `/health`
 - Default agent browser runbook: `agent/AGENT_BROWSER_NOVNC.md` (injected into `agents.defaults.system_prompt` at startup)
 
@@ -38,7 +40,7 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 
 ## How this build differs from upstream nullclaw
 
-- Pinned build from upstream commit `4101f63` plus two local source patches (subagent wake-up routing + tool-result history pruning).
+- Pinned build from upstream commit `4101f63` plus three local source patches (subagent wake-up routing + tool-result history pruning + optional private-host `http_request` access).
 - Railway-oriented runtime image with PinchTab, noVNC, Chromium, and optional Caddy proxy.
 - Entry-point config bootstrap from env with stricter value sanitizing and provider/auth wiring.
 - PinchTab health probe supports authenticated `/health` checks (`PINCHTAB_TOKEN`) to avoid startup loops.
@@ -59,13 +61,15 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 11. 2026-03-02: Added noVNC headed auto-start (profile auto-create + optional auto-navigate) to prevent blank noVNC sessions after deploy/restart.
 12. 2026-03-02: Added `patches/0002-prune-tool-result-history.patch` to remove internal tool scaffolding from persisted history after each turn, fixing stale delayed tool-error echoes on subsequent turns.
 13. 2026-03-02: Increased default `NULLCLAW_MAX_ACTIONS_PER_HOUR` to `500` and hardened browser runbook/runtime prompt so agent never asks user for PinchTab token and retries public/internal endpoint automatically on unauthorized.
+14. 2026-03-02: Added `patches/0003-http-request-allow-private-hosts.patch` plus unrestricted autonomy defaults (`full`, wildcard commands/paths, approvals off, high-risk block off) for fully-open execution.
 
 ## Patch audit
 
 1. Keep `patches/0001-subagent-wakeup.patch`: this is the core fix for your Telegram subagent completion visibility problem.
 2. Keep `patches/0002-prune-tool-result-history.patch`: prevents cross-turn stale `tool_result` contamination that produces delayed/duplicate error narratives.
-3. Keep authenticated PinchTab health check in `docker-entrypoint.sh`: required for Railway stability when `PINCHTAB_TOKEN` is enabled.
-4. Keep single-port noVNC proxy support, but only as opt-in (`PINCHTAB_NOVNC_PUBLIC_PATH`) to reduce default runtime complexity.
+3. Keep `patches/0003-http-request-allow-private-hosts.patch`: required when browser orchestration must call internal PinchTab endpoints (`127.0.0.1`/private hosts) via `http_request`.
+4. Keep authenticated PinchTab health check in `docker-entrypoint.sh`: required for Railway stability when `PINCHTAB_TOKEN` is enabled.
+5. Keep single-port noVNC proxy support, but only as opt-in (`PINCHTAB_NOVNC_PUBLIC_PATH`) to reduce default runtime complexity.
 
 ## Deploy on Railway
 
@@ -146,6 +150,7 @@ Audio:
 ### Web search + HTTP tool
 
 - `NULLCLAW_HTTP_ENABLED=true|false` (default: `true`)
+- `NULLCLAW_HTTP_ALLOW_PRIVATE_HOSTS=true|false` (default in this build: `true`; enables `http_request` to local/private hosts such as `127.0.0.1`)
 - `NULLCLAW_WEB_SEARCH_PROVIDER=auto|searxng|duckduckgo|brave|firecrawl|tavily|perplexity|exa|jina`
 - `NULLCLAW_WEB_SEARCH_BASE_URL=https://...` (optional, for SearXNG)
 - `NULLCLAW_WEB_SEARCH_FALLBACK_PROVIDERS=provider1,provider2` (optional CSV)
@@ -247,13 +252,13 @@ Playwright MCP env keys remain supported in config generation, but this image no
 
 ### Shell access / autonomy
 
-- `NULLCLAW_AUTONOMY_LEVEL=supervised|full|...`
-- `NULLCLAW_MAX_ACTIONS_PER_HOUR=500` (default in this build; raise if long browser workflows still hit autonomy rate limit)
-- `NULLCLAW_ALLOWED_COMMANDS=*` (CSV; set `*` for wildcard)
-- `NULLCLAW_ALLOWED_PATHS=*` (CSV; set `*` for wildcard)
-- `NULLCLAW_WORKSPACE_ONLY=true|false`
-- `NULLCLAW_REQUIRE_APPROVAL_FOR_MEDIUM_RISK=true|false`
-- `NULLCLAW_BLOCK_HIGH_RISK_COMMANDS=true|false`
+- `NULLCLAW_AUTONOMY_LEVEL=full` (default in this build)
+- `NULLCLAW_MAX_ACTIONS_PER_HOUR=100000` (default in this build)
+- `NULLCLAW_ALLOWED_COMMANDS=*` (default in this build)
+- `NULLCLAW_ALLOWED_PATHS=*` (default in this build)
+- `NULLCLAW_WORKSPACE_ONLY=false` (default in this build)
+- `NULLCLAW_REQUIRE_APPROVAL_FOR_MEDIUM_RISK=false` (default in this build)
+- `NULLCLAW_BLOCK_HIGH_RISK_COMMANDS=false` (default in this build)
 - Optional tool limits:
   - `NULLCLAW_SHELL_TIMEOUT_SECS`
   - `NULLCLAW_SHELL_MAX_OUTPUT_BYTES`
