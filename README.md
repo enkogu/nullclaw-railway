@@ -18,6 +18,42 @@ nullclaw gateway --host 0.0.0.0 --port $PORT
   - subagent execution uses the provider runtime stack (fixes `ProviderError` on Anthropic-style providers)
 - Health endpoint: `/health`
 
+## Sub-Agent wake-up solution
+
+This build patches nullclaw so a spawned subagent completion is not just a passive system event.
+
+Flow:
+
+1. The parent session remembers the original inbound route (channel/chat/account).
+2. Subagent completion is published back into the parent session key.
+3. Daemon routing resolves `agent`/subagent completion messages to the remembered route.
+4. Main agent is invoked again in the same session and can send a user-visible follow-up reply.
+
+Patch location: `patches/0001-subagent-wakeup.patch`
+
+## How this build differs from upstream nullclaw
+
+- Pinned build from upstream commit `4101f63` plus one local source patch for subagent wake-up and reply routing.
+- Railway-oriented runtime image with PinchTab, noVNC, Chromium, and optional Caddy proxy.
+- Entry-point config bootstrap from env with stricter value sanitizing and provider/auth wiring.
+- PinchTab health probe supports authenticated `/health` checks (`PINCHTAB_TOKEN`) to avoid startup loops.
+- Included helper CLI for browser session operations: `scripts/pinchtab-client.sh`.
+
+## Changelog
+
+1. 2026-03-02: Added `patches/0001-subagent-wakeup.patch` so subagent completion wakes the parent session and routes replies back to the originating channel/chat.
+2. 2026-03-02: Switched subagent provider execution to the runtime provider bundle, fixing provider/runtime mismatches (`ProviderError`) with Anthropic-style setups.
+3. 2026-03-02: Added integrated PinchTab + noVNC runtime support for persistent human login + agent browser reuse.
+4. 2026-03-02: Fixed PinchTab startup health checks when `PINCHTAB_TOKEN` is set by probing `/health` with bearer auth.
+5. 2026-03-02: Simplified noVNC public exposure: single-port Caddy proxy is now opt-in via `PINCHTAB_NOVNC_PUBLIC_PATH`.
+
+## Patch audit
+
+1. Keep `patches/0001-subagent-wakeup.patch`: this is the core fix for your Telegram subagent completion visibility problem.
+2. Keep authenticated PinchTab health check in `docker-entrypoint.sh`: required for Railway stability when `PINCHTAB_TOKEN` is enabled.
+3. Keep single-port noVNC proxy support, but only as opt-in (`PINCHTAB_NOVNC_PUBLIC_PATH`) to reduce default runtime complexity.
+4. No additional nullclaw source patches are carried; repository source delta stays minimal (one patch file).
+
 ## Deploy on Railway
 
 1. Create a new Railway project from this GitHub repository.
@@ -138,7 +174,7 @@ Recommended env:
 - `PINCHTAB_SCREEN=1280x720x24`
 - `PINCHTAB_VNC_PORT=5900`
 - `PINCHTAB_NOVNC_PORT=6080`
-- `PINCHTAB_NOVNC_PUBLIC_PATH=/novnc` (recommended on Railway/single public port)
+- `PINCHTAB_NOVNC_PUBLIC_PATH=/novnc` (optional; set on Railway/single public port)
 - Optional security:
   - `PINCHTAB_TOKEN=<api-token>`
   - `PINCHTAB_VNC_PASSWORD=<vnc-password>`
@@ -180,7 +216,7 @@ Helper client (`scripts/pinchtab-client.sh`):
 - `scripts/pinchtab-client.sh snapshot @user-123`
 
 Note:
-- If `PINCHTAB_NOVNC_PUBLIC_PATH` is set (defaulted to `/novnc` when noVNC is enabled), entrypoint starts `caddy`:
+- If `PINCHTAB_NOVNC_PUBLIC_PATH` is set, entrypoint starts `caddy`:
   - `/<novnc-path>/*` -> noVNC (`PINCHTAB_NOVNC_PORT`)
   - all other paths -> nullclaw gateway (`PORT`)
 

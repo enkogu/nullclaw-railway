@@ -68,6 +68,5 @@ ENV PORT=3000
 
 WORKDIR /data
 EXPOSE 3000 9867 5900 6080
-USER app
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
