@@ -118,53 +118,72 @@ Important:
 - Built-in `browser` tool supports `open` and `read`.
 - `click`/`type`/`scroll` require a CDP-capable backend (not built into this nullclaw version).
 
-### Playwright MCP (Browser Control)
+### PinchTab + noVNC (Human Login + Agent Reuse)
 
-Enable Playwright MCP for interactive browser control in Railway:
+This image runs PinchTab inside the same container as nullclaw:
 
-- `NULLCLAW_MCP_PLAYWRIGHT_ENABLED=true`
-- `NULLCLAW_MCP_PLAYWRIGHT_COMMAND=npx`
-- `NULLCLAW_MCP_PLAYWRIGHT_PACKAGE=@playwright/mcp`
-- `NULLCLAW_MCP_PLAYWRIGHT_HEADLESS=true`
-- `NULLCLAW_MCP_PLAYWRIGHT_ISOLATED=false` (for persistent login sessions)
-- Optional: `NULLCLAW_MCP_PLAYWRIGHT_BROWSER=chrome|firefox|webkit|msedge`
-- Optional: `NULLCLAW_MCP_PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium-browser`
-- Optional: `NULLCLAW_MCP_PLAYWRIGHT_USER_DATA_DIR=/data/.nullclaw/playwright-profile`
-- Optional: `NULLCLAW_MCP_PLAYWRIGHT_OUTPUT_DIR=/data/.nullclaw/playwright-output`
-- Optional: `NULLCLAW_MCP_PLAYWRIGHT_SAVE_SESSION=true`
-- Optional: `NULLCLAW_MCP_PLAYWRIGHT_SHARED_BROWSER_CONTEXT=true`
-- Optional: `NULLCLAW_MCP_PLAYWRIGHT_NO_SANDBOX=true` (needed if container runs as root)
+- PinchTab API/dashboard: `:9867`
+- noVNC (browser login UI): `:6080` (`/vnc.html`)
+- nullclaw gateway: `:3000`
 
-Recommended for Railway (external browser service):
-- `NULLCLAW_MCP_PLAYWRIGHT_CDP_ENDPOINT=wss://<your-cdp-endpoint>`
-- Optional auth header:
-  - `NULLCLAW_MCP_PLAYWRIGHT_CDP_HEADER=Authorization: Bearer <token>`
+Recommended env:
 
-Persistence recommendation:
-- Mount a Railway volume at `/data`.
-- Keep `NULLCLAW_MCP_PLAYWRIGHT_USER_DATA_DIR` under `/data` so auth cookies/sessions survive restarts.
+- `PINCHTAB_ENABLED=true`
+- `PINCHTAB_BIND=0.0.0.0`
+- `PINCHTAB_PORT=9867`
+- `PINCHTAB_STATE_DIR=/data/.pinchtab` (persist with mounted volume)
+- `PINCHTAB_HEADLESS_DEFAULT=true`
+- `PINCHTAB_NOVNC_ENABLED=true`
+- `PINCHTAB_DISPLAY=:99`
+- `PINCHTAB_SCREEN=1280x720x24`
+- `PINCHTAB_VNC_PORT=5900`
+- `PINCHTAB_NOVNC_PORT=6080`
+- Optional security:
+  - `PINCHTAB_TOKEN=<api-token>`
+  - `PINCHTAB_VNC_PASSWORD=<vnc-password>`
 
-### PinchTab Integration (Human + Agent Shared Sessions)
+Profile-based login flow (headed -> headless with preserved sessions):
 
-If you want a human to log in once and the agent to reuse that session, run PinchTab as a dedicated browser service and let nullclaw call it via shell/curl.
+```bash
+# 1) Start profile instance in headed mode
+curl -X POST http://localhost:9867/instances/start \
+  -H "Content-Type: application/json" \
+  -d '{"profileId":"user-123","mode":"headed"}'
 
-PinchTab server (separate host/service):
-- `BRIDGE_BIND=0.0.0.0`
-- `BRIDGE_TOKEN=<long-random-token>`
-- `BRIDGE_PROFILE=<profile-name>`
-- Persistent volume for `~/.pinchtab`
+# 2) User opens noVNC and logs in manually
+# http://<host>:6080/vnc.html?autoconnect=1&resize=scale
 
-nullclaw side:
-- `PINCHTAB_BASE_URL=http://<pinchtab-host>:9867`
-- `PINCHTAB_TOKEN=<same token>`
-- Use helper script: `scripts/pinchtab-client.sh`
+# 3) Stop headed instance
+curl -X POST http://localhost:9867/instances/<instance-id>/stop
 
-Examples:
-- `scripts/pinchtab-client.sh nav https://example.com`
-- `scripts/pinchtab-client.sh snapshot`
-- `scripts/pinchtab-client.sh click e5`
+# 4) Start same profile in headless mode (session reused)
+curl -X POST http://localhost:9867/instances/start \
+  -H "Content-Type: application/json" \
+  -d '{"profileId":"user-123","mode":"headless"}'
 
-This gives autonomous browser control via PinchTab API while allowing a human login/bootstrap flow outside Railway.
+# 5) Agent works with already logged-in session
+TAB_ID=$(curl -s -X POST http://localhost:9867/instances/<instance-id>/tabs/open \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://web.telegram.org"}' | jq -r '.tabId')
+
+curl "http://localhost:9867/tabs/${TAB_ID}/snapshot?format=compact&filter=interactive"
+```
+
+Helper client (`scripts/pinchtab-client.sh`):
+
+- `scripts/pinchtab-client.sh start user-123 headed`
+- `scripts/pinchtab-client.sh novnc-url <host>`
+- `scripts/pinchtab-client.sh switch-mode user-123 headless`
+- `scripts/pinchtab-client.sh navigate @user-123 https://web.telegram.org`
+- `scripts/pinchtab-client.sh snapshot @user-123`
+
+Note:
+- noVNC needs an additional exposed port (`PINCHTAB_NOVNC_PORT`, default `6080`).
+- If your platform exposes only one public port, run noVNC/PinchTab behind an additional proxy or separate service.
+
+### Playwright MCP (Legacy / Optional)
+
+Playwright MCP env keys remain supported in config generation, but this image now targets PinchTab-first browser operations.
 
 ### Shell access / autonomy
 
@@ -222,4 +241,4 @@ If relay URL/token are left as placeholders, this entrypoint auto-disables the w
 ## Notes
 
 - Config is generated on first boot. Set `NULLCLAW_REWRITE_CONFIG=true` for one deploy when changing env-driven config structure.
-- Runtime image includes `curl`, `git`, `bash`, `ripgrep`, `nodejs/npm`, and `chromium` for shell + Playwright browser automation.
+- Runtime image includes `curl`, `git`, `bash`, `ripgrep`, `jq`, `pinchtab`, `chromium`, `Xvfb`, `x11vnc`, and `noVNC` for shared human+agent browser sessions.

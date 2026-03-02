@@ -110,6 +110,27 @@ provider_key_for_name() {
   esac
 }
 
+wait_for_http_health() {
+  url="$1"
+  timeout_secs="$2"
+  service_name="$3"
+  auth_token="${4:-}"
+  elapsed=0
+  while [ "$elapsed" -lt "$timeout_secs" ]; do
+    if [ -n "$auth_token" ]; then
+      if curl -fsS -H "Authorization: Bearer ${auth_token}" "$url" >/dev/null 2>&1; then
+        return 0
+      fi
+    elif curl -fsS "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    elapsed=$((elapsed + 1))
+    sleep 1
+  done
+  echo "ERROR: ${service_name} failed health check at ${url} after ${timeout_secs}s." >&2
+  return 1
+}
+
 # Railway users often paste quoted values (KEY="value"). Normalize selected envs
 # so booleans/numbers/provider names and tokens are parsed correctly.
 for _env_name in \
@@ -126,6 +147,8 @@ for _env_name in \
   NULLCLAW_SHELL_TIMEOUT_SECS NULLCLAW_SHELL_MAX_OUTPUT_BYTES NULLCLAW_MAX_FILE_SIZE_BYTES NULLCLAW_WEB_FETCH_MAX_CHARS \
   NULLCLAW_WEB_ENABLED NULLCLAW_WEB_ACCOUNT_ID NULLCLAW_WEB_TRANSPORT NULLCLAW_WEB_LISTEN NULLCLAW_WEB_PORT NULLCLAW_WEB_PATH NULLCLAW_WEB_MAX_CONNECTIONS NULLCLAW_WEB_AUTH_TOKEN NULLCLAW_WEB_TOKEN NULLCLAW_GATEWAY_TOKEN OPENCLAW_GATEWAY_TOKEN NULLCLAW_WEB_MESSAGE_AUTH_MODE NULLCLAW_WEB_ALLOWED_ORIGINS NULLCLAW_WEB_RELAY_URL NULLCLAW_WEB_RELAY_AGENT_ID NULLCLAW_WEB_RELAY_TOKEN NULLCLAW_RELAY_TOKEN NULLCLAW_WEB_RELAY_TOKEN_TTL_SECS NULLCLAW_WEB_RELAY_PAIRING_CODE_TTL_SECS NULLCLAW_WEB_RELAY_UI_TOKEN_TTL_SECS NULLCLAW_WEB_RELAY_E2E_REQUIRED \
   NULLCLAW_MCP_PLAYWRIGHT_ENABLED NULLCLAW_MCP_PLAYWRIGHT_NAME NULLCLAW_MCP_PLAYWRIGHT_COMMAND NULLCLAW_MCP_PLAYWRIGHT_PACKAGE NULLCLAW_MCP_PLAYWRIGHT_HEADLESS NULLCLAW_MCP_PLAYWRIGHT_ISOLATED NULLCLAW_MCP_PLAYWRIGHT_BROWSER NULLCLAW_MCP_PLAYWRIGHT_CDP_ENDPOINT NULLCLAW_MCP_PLAYWRIGHT_CDP_HEADER NULLCLAW_MCP_PLAYWRIGHT_ALLOWED_HOSTS NULLCLAW_MCP_PLAYWRIGHT_ALLOWED_ORIGINS NULLCLAW_MCP_PLAYWRIGHT_IGNORE_HTTPS_ERRORS NULLCLAW_MCP_PLAYWRIGHT_EXECUTABLE_PATH NULLCLAW_MCP_PLAYWRIGHT_USER_DATA_DIR NULLCLAW_MCP_PLAYWRIGHT_OUTPUT_DIR NULLCLAW_MCP_PLAYWRIGHT_SAVE_SESSION NULLCLAW_MCP_PLAYWRIGHT_SHARED_BROWSER_CONTEXT NULLCLAW_MCP_PLAYWRIGHT_NO_SANDBOX \
+  PINCHTAB_ENABLED PINCHTAB_BIND PINCHTAB_PORT PINCHTAB_TOKEN PINCHTAB_HEADLESS_DEFAULT PINCHTAB_STATE_DIR PINCHTAB_PROFILE PINCHTAB_STEALTH PINCHTAB_BLOCK_ADS PINCHTAB_BLOCK_IMAGES PINCHTAB_BLOCK_MEDIA PINCHTAB_DEBUG PINCHTAB_LOG_LEVEL PINCHTAB_NO_DASHBOARD PINCHTAB_CHROME_BINARY PINCHTAB_CHROME_FLAGS PINCHTAB_NOVNC_ENABLED PINCHTAB_DISPLAY PINCHTAB_SCREEN PINCHTAB_VNC_PORT PINCHTAB_NOVNC_PORT PINCHTAB_NOVNC_WEB_DIR PINCHTAB_VNC_PASSWORD PINCHTAB_VNC_VIEW_ONLY PINCHTAB_STARTUP_TIMEOUT_SECS \
+  BRIDGE_BIND BRIDGE_PORT BRIDGE_TOKEN BRIDGE_HEADLESS BRIDGE_STATE_DIR BRIDGE_PROFILE BRIDGE_STEALTH BRIDGE_BLOCK_ADS BRIDGE_BLOCK_IMAGES BRIDGE_BLOCK_MEDIA BRIDGE_DEBUG BRIDGE_LOG_LEVEL BRIDGE_NO_DASHBOARD CHROME_BINARY CHROME_FLAGS DISPLAY \
   OPENROUTER_API_KEY OPENAI_API_KEY ANTHROPIC_API_KEY ANTHROPIC_OAUTH_TOKEN GROQ_API_KEY GEMINI_API_KEY XAI_API_KEY DEEPSEEK_API_KEY COHERE_API_KEY MISTRAL_API_KEY PERPLEXITY_API_KEY TOGETHER_API_KEY BRAVE_API_KEY FIRECRAWL_API_KEY TAVILY_API_KEY EXA_API_KEY JINA_API_KEY
 do
   sanitize_env_var "$_env_name"
@@ -246,6 +269,32 @@ NULLCLAW_WEB_RELAY_PAIRING_CODE_TTL_SECS="$(to_uint_or_default "${NULLCLAW_WEB_R
 NULLCLAW_WEB_RELAY_UI_TOKEN_TTL_SECS="$(to_uint_or_default "${NULLCLAW_WEB_RELAY_UI_TOKEN_TTL_SECS:-86400}" "86400")"
 NULLCLAW_WEB_RELAY_E2E_REQUIRED_JSON="$(to_json_bool "${NULLCLAW_WEB_RELAY_E2E_REQUIRED:-false}")"
 
+PINCHTAB_ENABLED_JSON="$(to_json_bool "${PINCHTAB_ENABLED:-true}")"
+PINCHTAB_BIND="${PINCHTAB_BIND:-${BRIDGE_BIND:-127.0.0.1}}"
+PINCHTAB_PORT="$(to_uint_or_default "${PINCHTAB_PORT:-${BRIDGE_PORT:-9867}}" "9867")"
+PINCHTAB_TOKEN="${PINCHTAB_TOKEN:-${BRIDGE_TOKEN:-}}"
+PINCHTAB_HEADLESS_DEFAULT_JSON="$(to_json_bool "${PINCHTAB_HEADLESS_DEFAULT:-${BRIDGE_HEADLESS:-true}}")"
+PINCHTAB_STATE_DIR="${PINCHTAB_STATE_DIR:-${BRIDGE_STATE_DIR:-${NULLCLAW_HOME}/.pinchtab}}"
+PINCHTAB_PROFILE="${PINCHTAB_PROFILE:-${BRIDGE_PROFILE:-default}}"
+PINCHTAB_STEALTH="${PINCHTAB_STEALTH:-${BRIDGE_STEALTH:-light}}"
+PINCHTAB_BLOCK_ADS_JSON="$(to_json_bool "${PINCHTAB_BLOCK_ADS:-${BRIDGE_BLOCK_ADS:-false}}")"
+PINCHTAB_BLOCK_IMAGES_JSON="$(to_json_bool "${PINCHTAB_BLOCK_IMAGES:-${BRIDGE_BLOCK_IMAGES:-false}}")"
+PINCHTAB_BLOCK_MEDIA_JSON="$(to_json_bool "${PINCHTAB_BLOCK_MEDIA:-${BRIDGE_BLOCK_MEDIA:-false}}")"
+PINCHTAB_DEBUG_JSON="$(to_json_bool "${PINCHTAB_DEBUG:-${BRIDGE_DEBUG:-false}}")"
+PINCHTAB_LOG_LEVEL="${PINCHTAB_LOG_LEVEL:-${BRIDGE_LOG_LEVEL:-info}}"
+PINCHTAB_NO_DASHBOARD_JSON="$(to_json_bool "${PINCHTAB_NO_DASHBOARD:-${BRIDGE_NO_DASHBOARD:-false}}")"
+PINCHTAB_CHROME_BINARY="${PINCHTAB_CHROME_BINARY:-${CHROME_BINARY:-}}"
+PINCHTAB_CHROME_FLAGS="${PINCHTAB_CHROME_FLAGS:-${CHROME_FLAGS:---no-sandbox --disable-gpu --disable-dev-shm-usage}}"
+PINCHTAB_NOVNC_ENABLED_JSON="$(to_json_bool "${PINCHTAB_NOVNC_ENABLED:-true}")"
+PINCHTAB_DISPLAY="${PINCHTAB_DISPLAY:-${DISPLAY:-:99}}"
+PINCHTAB_SCREEN="${PINCHTAB_SCREEN:-1280x720x24}"
+PINCHTAB_VNC_PORT="$(to_uint_or_default "${PINCHTAB_VNC_PORT:-5900}" "5900")"
+PINCHTAB_NOVNC_PORT="$(to_uint_or_default "${PINCHTAB_NOVNC_PORT:-6080}" "6080")"
+PINCHTAB_NOVNC_WEB_DIR="${PINCHTAB_NOVNC_WEB_DIR:-/usr/share/novnc}"
+PINCHTAB_VNC_PASSWORD="${PINCHTAB_VNC_PASSWORD:-}"
+PINCHTAB_VNC_VIEW_ONLY_JSON="$(to_json_bool "${PINCHTAB_VNC_VIEW_ONLY:-false}")"
+PINCHTAB_STARTUP_TIMEOUT_SECS="$(to_uint_or_default "${PINCHTAB_STARTUP_TIMEOUT_SECS:-30}" "30")"
+
 if is_placeholder_value "$NULLCLAW_MCP_PLAYWRIGHT_CDP_ENDPOINT"; then
   echo "WARN: Ignoring placeholder NULLCLAW_MCP_PLAYWRIGHT_CDP_ENDPOINT value; using local browser mode." >&2
   NULLCLAW_MCP_PLAYWRIGHT_CDP_ENDPOINT=""
@@ -255,6 +304,19 @@ if is_placeholder_value "$NULLCLAW_WEB_RELAY_URL"; then
 fi
 if is_placeholder_value "$NULLCLAW_WEB_RELAY_TOKEN"; then
   NULLCLAW_WEB_RELAY_TOKEN=""
+fi
+if is_placeholder_value "$PINCHTAB_TOKEN"; then
+  echo "WARN: Ignoring placeholder PINCHTAB_TOKEN value; PinchTab auth token disabled." >&2
+  PINCHTAB_TOKEN=""
+fi
+
+if [ -z "$PINCHTAB_CHROME_BINARY" ]; then
+  for _chrome_bin in /usr/bin/chromium-browser /usr/bin/chromium /usr/bin/google-chrome-stable; do
+    if [ -x "$_chrome_bin" ]; then
+      PINCHTAB_CHROME_BINARY="$_chrome_bin"
+      break
+    fi
+  done
 fi
 
 MCP_BROWSER_LC="$(printf '%s' "$NULLCLAW_MCP_PLAYWRIGHT_BROWSER" | tr '[:upper:]' '[:lower:]')"
@@ -833,5 +895,132 @@ fi
 export HOME="$NULLCLAW_HOME"
 export NULLCLAW_WORKSPACE="$WORKSPACE_DIR"
 
+BACKGROUND_PIDS=""
+track_pid() {
+  pid="$1"
+  if [ -n "$BACKGROUND_PIDS" ]; then
+    BACKGROUND_PIDS="${BACKGROUND_PIDS} ${pid}"
+  else
+    BACKGROUND_PIDS="${pid}"
+  fi
+}
+
+start_bg() {
+  label="$1"
+  shift
+  "$@" &
+  pid=$!
+  track_pid "$pid"
+  echo "Started ${label} (pid=${pid})"
+}
+
+cleanup_background() {
+  trap - EXIT INT TERM
+  for pid in $BACKGROUND_PIDS; do
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      kill "$pid" >/dev/null 2>&1 || true
+    fi
+  done
+  for pid in $BACKGROUND_PIDS; do
+    wait "$pid" >/dev/null 2>&1 || true
+  done
+}
+trap cleanup_background EXIT INT TERM
+
+if [ "$PINCHTAB_ENABLED_JSON" = "true" ]; then
+  if ! command -v pinchtab >/dev/null 2>&1; then
+    echo "ERROR: PINCHTAB_ENABLED=true but 'pinchtab' binary is not available in PATH." >&2
+    exit 1
+  fi
+
+  mkdir -p "$PINCHTAB_STATE_DIR"
+
+  export BRIDGE_BIND="$PINCHTAB_BIND"
+  export BRIDGE_PORT="$PINCHTAB_PORT"
+  export BRIDGE_HEADLESS="$PINCHTAB_HEADLESS_DEFAULT_JSON"
+  export BRIDGE_STATE_DIR="$PINCHTAB_STATE_DIR"
+  export BRIDGE_PROFILE="$PINCHTAB_PROFILE"
+  export BRIDGE_STEALTH="$PINCHTAB_STEALTH"
+  export BRIDGE_BLOCK_ADS="$PINCHTAB_BLOCK_ADS_JSON"
+  export BRIDGE_BLOCK_IMAGES="$PINCHTAB_BLOCK_IMAGES_JSON"
+  export BRIDGE_BLOCK_MEDIA="$PINCHTAB_BLOCK_MEDIA_JSON"
+  export BRIDGE_DEBUG="$PINCHTAB_DEBUG_JSON"
+  export BRIDGE_LOG_LEVEL="$PINCHTAB_LOG_LEVEL"
+  export BRIDGE_NO_DASHBOARD="$PINCHTAB_NO_DASHBOARD_JSON"
+  if [ -n "$PINCHTAB_TOKEN" ]; then
+    export BRIDGE_TOKEN="$PINCHTAB_TOKEN"
+  else
+    unset BRIDGE_TOKEN || true
+    if [ "$PINCHTAB_BIND" = "0.0.0.0" ]; then
+      echo "WARN: PinchTab is exposed on 0.0.0.0 without PINCHTAB_TOKEN." >&2
+    fi
+  fi
+  if [ -n "$PINCHTAB_CHROME_BINARY" ]; then
+    export CHROME_BINARY="$PINCHTAB_CHROME_BINARY"
+  fi
+  export CHROME_FLAGS="$PINCHTAB_CHROME_FLAGS"
+
+  if [ "$PINCHTAB_NOVNC_ENABLED_JSON" = "true" ]; then
+    for _display_cmd in Xvfb x11vnc websockify; do
+      if ! command -v "$_display_cmd" >/dev/null 2>&1; then
+        echo "ERROR: PINCHTAB_NOVNC_ENABLED=true but '${_display_cmd}' is missing." >&2
+        exit 1
+      fi
+    done
+    if [ ! -d "$PINCHTAB_NOVNC_WEB_DIR" ]; then
+      echo "ERROR: noVNC web dir '${PINCHTAB_NOVNC_WEB_DIR}' does not exist." >&2
+      exit 1
+    fi
+
+    export DISPLAY="$PINCHTAB_DISPLAY"
+    echo "Starting noVNC on http://0.0.0.0:${PINCHTAB_NOVNC_PORT}/vnc.html (display=${PINCHTAB_DISPLAY}, vnc=${PINCHTAB_VNC_PORT})"
+    start_bg "Xvfb" Xvfb "$PINCHTAB_DISPLAY" -screen 0 "$PINCHTAB_SCREEN" -ac +extension RANDR
+    sleep 1
+
+    PINCHTAB_VNC_PASS_FILE=""
+    if [ -n "$PINCHTAB_VNC_PASSWORD" ]; then
+      PINCHTAB_VNC_PASS_FILE="${PINCHTAB_STATE_DIR}/.vnc-passwd"
+      x11vnc -storepasswd "$PINCHTAB_VNC_PASSWORD" "$PINCHTAB_VNC_PASS_FILE" >/dev/null
+      chmod 600 "$PINCHTAB_VNC_PASS_FILE" || true
+    else
+      echo "WARN: noVNC is enabled without PINCHTAB_VNC_PASSWORD; VNC access is unauthenticated." >&2
+    fi
+
+    if [ "$PINCHTAB_VNC_VIEW_ONLY_JSON" = "true" ]; then
+      if [ -n "$PINCHTAB_VNC_PASS_FILE" ]; then
+        start_bg "x11vnc" x11vnc -display "$PINCHTAB_DISPLAY" -rfbport "$PINCHTAB_VNC_PORT" -forever -shared -viewonly -rfbauth "$PINCHTAB_VNC_PASS_FILE"
+      else
+        start_bg "x11vnc" x11vnc -display "$PINCHTAB_DISPLAY" -rfbport "$PINCHTAB_VNC_PORT" -forever -shared -viewonly -nopw
+      fi
+    else
+      if [ -n "$PINCHTAB_VNC_PASS_FILE" ]; then
+        start_bg "x11vnc" x11vnc -display "$PINCHTAB_DISPLAY" -rfbport "$PINCHTAB_VNC_PORT" -forever -shared -rfbauth "$PINCHTAB_VNC_PASS_FILE"
+      else
+        start_bg "x11vnc" x11vnc -display "$PINCHTAB_DISPLAY" -rfbport "$PINCHTAB_VNC_PORT" -forever -shared -nopw
+      fi
+    fi
+
+    start_bg "websockify" websockify --web "$PINCHTAB_NOVNC_WEB_DIR" "$PINCHTAB_NOVNC_PORT" "127.0.0.1:${PINCHTAB_VNC_PORT}"
+    wait_for_http_health "http://127.0.0.1:${PINCHTAB_NOVNC_PORT}/vnc.html" "$PINCHTAB_STARTUP_TIMEOUT_SECS" "noVNC"
+  fi
+
+  echo "Starting PinchTab bridge on ${PINCHTAB_BIND}:${PINCHTAB_PORT} (headless_default=${PINCHTAB_HEADLESS_DEFAULT_JSON}, state_dir=${PINCHTAB_STATE_DIR})"
+  start_bg "PinchTab" pinchtab
+  wait_for_http_health "http://127.0.0.1:${PINCHTAB_PORT}/health" "$PINCHTAB_STARTUP_TIMEOUT_SECS" "PinchTab" "$PINCHTAB_TOKEN"
+else
+  if [ "$PINCHTAB_NOVNC_ENABLED_JSON" = "true" ]; then
+    echo "WARN: PINCHTAB_NOVNC_ENABLED=true ignored because PINCHTAB_ENABLED=false." >&2
+  fi
+fi
+
 echo "Starting nullclaw gateway on ${HOST}:${PORT} with provider=${PROVIDER} model=${PRIMARY_MODEL}"
-exec nullclaw gateway --host "$HOST" --port "$PORT"
+nullclaw gateway --host "$HOST" --port "$PORT" &
+NULLCLAW_PID=$!
+track_pid "$NULLCLAW_PID"
+echo "Started nullclaw gateway (pid=${NULLCLAW_PID})"
+
+set +e
+wait "$NULLCLAW_PID"
+NULLCLAW_STATUS=$?
+set -e
+exit "$NULLCLAW_STATUS"
