@@ -24,6 +24,7 @@ nullclaw gateway --host 0.0.0.0 --port $PORT
     - allows private/local targets in `http_request` when `NULLCLAW_HTTP_ALLOW_PRIVATE_HOSTS=true` (enabled by default in this build)
 - Health endpoint: `/health`
 - Default agent browser runbook: `agent/AGENT_BROWSER_NOVNC.md` (injected into `agents.defaults.system_prompt` at startup)
+- Workspace prompt templates: `agent/resources/*.md` (seeded into workspace on first boot if missing)
 
 ## Sub-Agent wake-up solution
 
@@ -62,7 +63,8 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 12. 2026-03-02: Added `patches/0002-prune-tool-result-history.patch` to remove internal tool scaffolding from persisted history after each turn, fixing stale delayed tool-error echoes on subsequent turns.
 13. 2026-03-02: Increased default `NULLCLAW_MAX_ACTIONS_PER_HOUR` to `500` and hardened browser runbook/runtime prompt so agent never asks user for PinchTab token and retries public/internal endpoint automatically on unauthorized.
 14. 2026-03-02: Added `patches/0003-http-request-allow-private-hosts.patch` plus unrestricted autonomy defaults (`full`, wildcard commands/paths, approvals off, high-risk block off) for fully-open execution.
-15. 2026-03-02: Switched default `NULLCLAW_REWRITE_CONFIG=true` so env-driven runtime/security changes are always applied even with persisted `/data` volumes.
+15. 2026-03-02: Added bundled OpenClaw-style workspace markdown templates under `agent/resources/`; entrypoint now seeds missing files (`AGENTS.md`, `SOUL.md`, `TOOLS.md`, `IDENTITY.md`, `USER.md`, `HEARTBEAT.md`, `BOOTSTRAP.md`) into a new workspace before Railway browser block injection.
+16. 2026-03-02: Switched default `NULLCLAW_REWRITE_CONFIG=true` so env-driven runtime/security changes are always applied even with persisted `/data` volumes.
 
 ## Patch audit
 
@@ -246,6 +248,8 @@ Note:
 - On startup with noVNC enabled, entrypoint auto-creates/starts a headed PinchTab profile so browser window is visible immediately in noVNC.
 - Agent behavior is guided by `agent/AGENT_BROWSER_NOVNC.md`; at startup this runbook is injected into the default `system_prompt` with runtime values (noVNC URL/password/token).
 - Optional override: `NULLCLAW_AGENT_RUNBOOK_PATH=/path/to/your-runbook.md`.
+- On fresh instances, entrypoint seeds missing workspace prompt files from `/opt/nullclaw/workspace_templates` (copied from `agent/resources` at build time). Existing workspace files are not overwritten.
+- Optional override: `NULLCLAW_WORKSPACE_TEMPLATE_DIR=/path/to/markdown-templates`.
 
 ### Playwright MCP (Legacy / Optional)
 
