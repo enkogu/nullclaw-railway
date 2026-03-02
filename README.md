@@ -41,12 +41,13 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 
 ## Changelog
 
-1. 2026-03-02: Added `patches/0001-subagent-wakeup.patch` so subagent completion wakes the parent session and routes replies back to the originating channel/chat.
-2. 2026-03-02: Switched subagent provider execution to the runtime provider bundle, fixing provider/runtime mismatches (`ProviderError`) with Anthropic-style setups.
-3. 2026-03-02: Added integrated PinchTab + noVNC runtime support for persistent human login + agent browser reuse.
-4. 2026-03-02: Fixed PinchTab startup health checks when `PINCHTAB_TOKEN` is set by probing `/health` with bearer auth.
-5. 2026-03-02: Simplified noVNC public exposure: single-port Caddy proxy is now opt-in via `PINCHTAB_NOVNC_PUBLIC_PATH`.
-6. 2026-03-02: Added noVNC headed auto-start (profile auto-create + optional auto-navigate) to prevent blank noVNC sessions after deploy/restart.
+1. 2026-03-02: Added stale Chromium profile-lock cleanup at startup (removes `Singleton*`, `LOCK`, `DevToolsActivePort`) so headed PinchTab/noVNC sessions recover after unclean restarts.
+2. 2026-03-02: Added `patches/0001-subagent-wakeup.patch` so subagent completion wakes the parent session and routes replies back to the originating channel/chat.
+3. 2026-03-02: Switched subagent provider execution to the runtime provider bundle, fixing provider/runtime mismatches (`ProviderError`) with Anthropic-style setups.
+4. 2026-03-02: Added integrated PinchTab + noVNC runtime support for persistent human login + agent browser reuse.
+5. 2026-03-02: Fixed PinchTab startup health checks when `PINCHTAB_TOKEN` is set by probing `/health` with bearer auth.
+6. 2026-03-02: Simplified noVNC public exposure: single-port Caddy proxy is now opt-in via `PINCHTAB_NOVNC_PUBLIC_PATH`.
+7. 2026-03-02: Added noVNC headed auto-start (profile auto-create + optional auto-navigate) to prevent blank noVNC sessions after deploy/restart.
 
 ## Patch audit
 

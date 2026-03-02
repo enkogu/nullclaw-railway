@@ -131,6 +131,25 @@ wait_for_http_health() {
   return 1
 }
 
+cleanup_stale_chromium_locks() {
+  profiles_dir="$1"
+
+  [ -d "$profiles_dir" ] || return 0
+
+  # Do not touch lock files while Chromium may still be alive.
+  if ps aux | grep -E '[c]hrom(e|ium)' >/dev/null 2>&1; then
+    echo "Skipping Chromium lock cleanup: active Chromium process detected."
+    return 0
+  fi
+
+  find "$profiles_dir" -maxdepth 4 \
+    \( -name 'SingletonLock' -o -name 'SingletonSocket' -o -name 'SingletonCookie' -o -name 'LOCK' -o -name 'DevToolsActivePort' \) \
+    -print 2>/dev/null | while IFS= read -r lock_path; do
+      [ -n "$lock_path" ] || continue
+      rm -f "$lock_path" 2>/dev/null || true
+  done
+}
+
 # Railway users often paste quoted values (KEY="value"). Normalize selected envs
 # so booleans/numbers/provider names and tokens are parsed correctly.
 for _env_name in \
@@ -1050,6 +1069,7 @@ if [ "$PINCHTAB_ENABLED_JSON" = "true" ]; then
   echo "Starting PinchTab bridge on ${PINCHTAB_BIND}:${PINCHTAB_PORT} (headless_default=${PINCHTAB_HEADLESS_DEFAULT_JSON}, state_dir=${PINCHTAB_STATE_DIR})"
   start_bg "PinchTab" pinchtab
   wait_for_http_health "http://127.0.0.1:${PINCHTAB_PORT}/health" "$PINCHTAB_STARTUP_TIMEOUT_SECS" "PinchTab" "$PINCHTAB_TOKEN"
+  cleanup_stale_chromium_locks "${PINCHTAB_STATE_DIR}/profiles"
 
   if [ "$PINCHTAB_NOVNC_ENABLED_JSON" = "true" ] && [ "$PINCHTAB_NOVNC_AUTOSTART_HEADED_JSON" = "true" ]; then
     if [ -x /usr/local/bin/pinchtab-client.sh ]; then
