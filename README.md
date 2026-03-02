@@ -42,16 +42,17 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 
 ## Changelog
 
-1. 2026-03-02: Entry-point now injects a Railway browser-control section into workspace `AGENTS.md` and `TOOLS.md`, so runtime behavior explicitly follows noVNC -> `done` -> PinchTab session commands.
-2. 2026-03-02: Updated browser/noVNC runbook to force PinchTab-session workflow after user confirms login (`done`), avoiding separate internal browser sessions for authenticated sites.
-3. 2026-03-02: Added markdown-based browser/noVNC operator runbook (`agent/AGENT_BROWSER_NOVNC.md`) injected into default agent `system_prompt`, including runtime noVNC URL/password hints and user handoff flow.
-4. 2026-03-02: Added stale Chromium profile-lock cleanup at startup (removes `Singleton*`, `LOCK`, `DevToolsActivePort`) so headed PinchTab/noVNC sessions recover after unclean restarts.
-5. 2026-03-02: Added `patches/0001-subagent-wakeup.patch` so subagent completion wakes the parent session and routes replies back to the originating channel/chat.
-6. 2026-03-02: Switched subagent provider execution to the runtime provider bundle, fixing provider/runtime mismatches (`ProviderError`) with Anthropic-style setups.
-7. 2026-03-02: Added integrated PinchTab + noVNC runtime support for persistent human login + agent browser reuse.
-8. 2026-03-02: Fixed PinchTab startup health checks when `PINCHTAB_TOKEN` is set by probing `/health` with bearer auth.
-9. 2026-03-02: Simplified noVNC public exposure: single-port Caddy proxy is now opt-in via `PINCHTAB_NOVNC_PUBLIC_PATH`.
-10. 2026-03-02: Added noVNC headed auto-start (profile auto-create + optional auto-navigate) to prevent blank noVNC sessions after deploy/restart.
+1. 2026-03-02: Added optional public PinchTab API exposure via `PINCHTAB_API_PUBLIC_PATH` (single-port Caddy proxy), so agent `http_request` can call PinchTab without blocked `127.0.0.1` local-host access.
+2. 2026-03-02: Entry-point now injects a Railway browser-control section into workspace `AGENTS.md` and `TOOLS.md`, so runtime behavior explicitly follows noVNC -> `done` -> PinchTab session commands.
+3. 2026-03-02: Updated browser/noVNC runbook to force PinchTab-session workflow after user confirms login (`done`), avoiding separate internal browser sessions for authenticated sites.
+4. 2026-03-02: Added markdown-based browser/noVNC operator runbook (`agent/AGENT_BROWSER_NOVNC.md`) injected into default agent `system_prompt`, including runtime noVNC URL/password hints and user handoff flow.
+5. 2026-03-02: Added stale Chromium profile-lock cleanup at startup (removes `Singleton*`, `LOCK`, `DevToolsActivePort`) so headed PinchTab/noVNC sessions recover after unclean restarts.
+6. 2026-03-02: Added `patches/0001-subagent-wakeup.patch` so subagent completion wakes the parent session and routes replies back to the originating channel/chat.
+7. 2026-03-02: Switched subagent provider execution to the runtime provider bundle, fixing provider/runtime mismatches (`ProviderError`) with Anthropic-style setups.
+8. 2026-03-02: Added integrated PinchTab + noVNC runtime support for persistent human login + agent browser reuse.
+9. 2026-03-02: Fixed PinchTab startup health checks when `PINCHTAB_TOKEN` is set by probing `/health` with bearer auth.
+10. 2026-03-02: Simplified noVNC public exposure: single-port Caddy proxy is now opt-in via `PINCHTAB_NOVNC_PUBLIC_PATH`.
+11. 2026-03-02: Added noVNC headed auto-start (profile auto-create + optional auto-navigate) to prevent blank noVNC sessions after deploy/restart.
 
 ## Patch audit
 
@@ -181,6 +182,7 @@ Recommended env:
 - `PINCHTAB_VNC_PORT=5900`
 - `PINCHTAB_NOVNC_PORT=6080`
 - `PINCHTAB_NOVNC_PUBLIC_PATH=/novnc` (optional; set on Railway/single public port)
+- `PINCHTAB_API_PUBLIC_PATH=/pinchtab` (optional; expose PinchTab API on same public domain/port)
 - `PINCHTAB_NOVNC_AUTOSTART_HEADED=true` (default in this build; ensures noVNC is not blank)
 - `PINCHTAB_NOVNC_AUTOSTART_PROFILE=default`
 - `PINCHTAB_NOVNC_AUTOSTART_URL=https://example.com` (optional first page for headed auto-start)
@@ -225,8 +227,9 @@ Helper client (`scripts/pinchtab-client.sh`):
 - `scripts/pinchtab-client.sh snapshot @user-123`
 
 Note:
-- If `PINCHTAB_NOVNC_PUBLIC_PATH` is set, entrypoint starts `caddy`:
+- If `PINCHTAB_NOVNC_PUBLIC_PATH` and/or `PINCHTAB_API_PUBLIC_PATH` is set, entrypoint starts `caddy`:
   - `/<novnc-path>/*` -> noVNC (`PINCHTAB_NOVNC_PORT`)
+  - `/<pinchtab-path>/*` -> PinchTab API (`PINCHTAB_PORT`)
   - all other paths -> nullclaw gateway (`PORT`)
 - On startup with noVNC enabled, entrypoint auto-creates/starts a headed PinchTab profile so browser window is visible immediately in noVNC.
 - Agent behavior is guided by `agent/AGENT_BROWSER_NOVNC.md`; at startup this runbook is injected into the default `system_prompt` with runtime values (noVNC URL/password/token).
