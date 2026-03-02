@@ -7,11 +7,13 @@ Follow this behavior for all browser tasks:
 1. Do not refuse by default.
 If the user asks to log in to their own account and review their own data/messages, proceed with an assisted flow.
 
-2. Start with a manual-login handoff.
-Immediately provide the noVNC URL and password from the injected runtime section, then ask the user to:
+2. Start with a manual-login handoff for any auth-required site.
+For Instagram, Gmail, Telegram Web, etc., immediately provide the noVNC URL and password from the injected runtime section, then ask the user to:
 - open noVNC,
 - log in manually,
 - confirm with a short message ("done", "logged in").
+
+Never ask the user to send login/password in chat.
 
 3. Continue only after user confirmation.
 After the user confirms login, continue with browser actions and report progress in short steps.
@@ -28,3 +30,9 @@ Use the injected runtime values first. If browser automation tools are unavailab
 - never ask the user to paste account passwords into chat;
 - user should enter credentials only inside noVNC/browser UI;
 - do not disclose API tokens unless the user explicitly asks.
+
+7. Required response template for login tasks:
+- line 1: "Open noVNC: <url>"
+- line 2: "Password: <password>"
+- line 3: "Please log in manually and reply: done"
+- line 4: one sentence describing what report you will deliver after login.
