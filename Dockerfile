@@ -56,6 +56,7 @@ COPY --from=builder /src/nullclaw/zig-out/bin/nullclaw /usr/local/bin/nullclaw
 COPY --from=pinchtab-builder /out/pinchtab /usr/local/bin/pinchtab
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY scripts/pinchtab-client.sh /usr/local/bin/pinchtab-client.sh
+COPY agent/AGENT_BROWSER_NOVNC.md /opt/nullclaw/AGENT_BROWSER_NOVNC.md
 
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/pinchtab-client.sh /usr/local/bin/pinchtab \
     && mkdir -p /data/.nullclaw/workspace \
