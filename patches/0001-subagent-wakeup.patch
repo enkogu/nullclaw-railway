@@ -1,5 +1,52 @@
+diff --git a/src/channel_loop.zig b/src/channel_loop.zig
+index e84ba10..00c1d49 100644
+--- a/src/channel_loop.zig
++++ b/src/channel_loop.zig
+@@ -450,6 +450,13 @@ pub fn runTelegramLoop(
+             tg_ptr.startTyping(typing_target) catch {};
+             defer tg_ptr.stopTyping(typing_target) catch {};
+ 
++            runtime.session_mgr.rememberReplyRoute(
++                session_key,
++                "telegram",
++                msg.sender,
++                tg_ptr.account_id,
++            ) catch {};
++
+             const reply = runtime.session_mgr.processMessage(session_key, msg.content, null) catch |err| {
+                 log.err("Agent error: {}", .{err});
+                 const err_msg: []const u8 = switch (err) {
+@@ -581,6 +588,14 @@ pub fn runSignalLoop(
+             if (typing_target) |target| sg_ptr.startTyping(target) catch {};
+             defer if (typing_target) |target| sg_ptr.stopTyping(target) catch {};
+ 
++            const signal_reply_target = msg.reply_target orelse msg.sender;
++            runtime.session_mgr.rememberReplyRoute(
++                session_key,
++                "signal",
++                signal_reply_target,
++                sg_ptr.account_id,
++            ) catch {};
++
+             // Build conversation context for Signal
+             const conversation_context: ?ConversationContext = .{
+                 .channel = "signal",
+@@ -791,6 +806,13 @@ pub fn runMatrixLoop(
+             mx_ptr.startTyping(typing_target) catch {};
+             defer mx_ptr.stopTyping(typing_target) catch {};
+ 
++            runtime.session_mgr.rememberReplyRoute(
++                session_key,
++                "matrix",
++                typing_target,
++                mx_ptr.account_id,
++            ) catch {};
++
+             const reply = runtime.session_mgr.processMessage(session_key, msg.content, null) catch |err| {
+                 log.err("Matrix agent error: {}", .{err});
+                 const err_msg: []const u8 = switch (err) {
 diff --git a/src/daemon.zig b/src/daemon.zig
-index 3d279d7..4fab356 100644
+index 3d279d7..1630b1e 100644
 --- a/src/daemon.zig
 +++ b/src/daemon.zig
 @@ -601,6 +601,65 @@ fn clearInboundProcessingIndicator(
@@ -77,7 +124,7 @@ index 3d279d7..4fab356 100644
  
      while (event_bus.consumeInbound()) |msg| {
          defer msg.deinit(allocator);
-@@ -655,29 +716,51 @@ fn inboundDispatcherThread(
+@@ -655,29 +716,70 @@ fn inboundDispatcherThread(
          defer if (routed_session_key) |key| allocator.free(key);
          const session_key = routed_session_key orelse msg.session_key;
  
@@ -90,12 +137,31 @@ index 3d279d7..4fab356 100644
 +                msg.chat_id,
 +                outbound_account_id,
 +            ) catch {};
++            runtime.session_mgr.rememberReplyRoute(
++                session_key,
++                msg.channel,
++                msg.chat_id,
++                outbound_account_id,
++            ) catch {};
 +        }
 +
 +        var outbound_channel = msg.channel;
 +        var outbound_chat_id = msg.chat_id;
 +        var effective_account_id = outbound_account_id;
 +        if (std.mem.eql(u8, msg.channel, "agent")) {
++            if (session_reply_routes.get(session_key) == null) {
++                if (runtime.session_mgr.getReplyRoute(allocator, session_key)) |remembered| {
++                    defer remembered.deinit(allocator);
++                    upsertSessionReplyRoute(
++                        allocator,
++                        &session_reply_routes,
++                        session_key,
++                        remembered.channel,
++                        remembered.chat_id,
++                        remembered.account_id,
++                    ) catch {};
++                }
++            }
 +            if (session_reply_routes.get(session_key)) |route| {
 +                outbound_channel = route.channel;
 +                outbound_chat_id = route.chat_id;
@@ -138,7 +204,7 @@ index 3d279d7..4fab356 100644
          };
  
          const reply = runtime.session_mgr.processMessageStreaming(
-@@ -702,10 +785,10 @@ fn inboundDispatcherThread(
+@@ -702,10 +804,10 @@ fn inboundDispatcherThread(
                  error.OutOfMemory => "Out of memory.",
                  else => "An error occurred. Try again.",
              };
@@ -152,7 +218,7 @@ index 3d279d7..4fab356 100644
              event_bus.publishOutbound(err_out) catch {
                  err_out.deinit(allocator);
              };
-@@ -713,10 +796,10 @@ fn inboundDispatcherThread(
+@@ -713,10 +815,10 @@ fn inboundDispatcherThread(
          };
          defer allocator.free(reply);
  
@@ -166,7 +232,7 @@ index 3d279d7..4fab356 100644
              log.err("inbound dispatch makeOutbound failed: {}", .{err});
              continue;
          };
-@@ -844,6 +927,11 @@ pub fn run(allocator: std.mem.Allocator, config: *const Config, host: []const u8
+@@ -844,6 +946,11 @@ pub fn run(allocator: std.mem.Allocator, config: *const Config, host: []const u8
          };
      }
      defer if (channel_rt) |rt| rt.deinit();
@@ -178,6 +244,123 @@ index 3d279d7..4fab356 100644
  
      // Spawn channel supervisor thread (only if channels are configured)
      var chan_thread: ?std.Thread = null;
+diff --git a/src/session.zig b/src/session.zig
+index 0710219..9d0995c 100644
+--- a/src/session.zig
++++ b/src/session.zig
+@@ -70,6 +70,31 @@ pub const SessionManager = struct {
+ 
+     mutex: std.Thread.Mutex,
+     sessions: std.StringHashMapUnmanaged(*Session),
++    reply_routes: std.StringHashMapUnmanaged(ReplyRoute),
++
++    const ReplyRoute = struct {
++        channel: []const u8,
++        chat_id: []const u8,
++        account_id: ?[]const u8 = null,
++
++        fn deinit(self: *ReplyRoute, allocator: Allocator) void {
++            allocator.free(self.channel);
++            allocator.free(self.chat_id);
++            if (self.account_id) |aid| allocator.free(aid);
++        }
++    };
++
++    pub const ReplyRouteSnapshot = struct {
++        channel: []const u8,
++        chat_id: []const u8,
++        account_id: ?[]const u8 = null,
++
++        pub fn deinit(self: ReplyRouteSnapshot, allocator: Allocator) void {
++            allocator.free(self.channel);
++            allocator.free(self.chat_id);
++            if (self.account_id) |aid| allocator.free(aid);
++        }
++    };
+ 
+     pub fn init(
+         allocator: Allocator,
+@@ -94,6 +119,7 @@ pub const SessionManager = struct {
+             .observer = observer_i,
+             .mutex = .{},
+             .sessions = .{},
++            .reply_routes = .{},
+         };
+     }
+ 
+@@ -104,6 +130,72 @@ pub const SessionManager = struct {
+             self.allocator.destroy(entry.value_ptr.*);
+         }
+         self.sessions.deinit(self.allocator);
++
++        var route_it = self.reply_routes.iterator();
++        while (route_it.next()) |entry| {
++            self.allocator.free(entry.key_ptr.*);
++            entry.value_ptr.deinit(self.allocator);
++        }
++        self.reply_routes.deinit(self.allocator);
++    }
++
++    pub fn rememberReplyRoute(
++        self: *SessionManager,
++        session_key: []const u8,
++        channel: []const u8,
++        chat_id: []const u8,
++        account_id: ?[]const u8,
++    ) !void {
++        self.mutex.lock();
++        defer self.mutex.unlock();
++
++        const channel_copy = try self.allocator.dupe(u8, channel);
++        errdefer self.allocator.free(channel_copy);
++        const chat_copy = try self.allocator.dupe(u8, chat_id);
++        errdefer self.allocator.free(chat_copy);
++        const account_copy = if (account_id) |aid| try self.allocator.dupe(u8, aid) else null;
++        errdefer if (account_copy) |aid| self.allocator.free(aid);
++
++        if (self.reply_routes.getEntry(session_key)) |entry| {
++            entry.value_ptr.deinit(self.allocator);
++            entry.value_ptr.* = .{
++                .channel = channel_copy,
++                .chat_id = chat_copy,
++                .account_id = account_copy,
++            };
++            return;
++        }
++
++        const key_copy = try self.allocator.dupe(u8, session_key);
++        errdefer self.allocator.free(key_copy);
++
++        try self.reply_routes.put(self.allocator, key_copy, .{
++            .channel = channel_copy,
++            .chat_id = chat_copy,
++            .account_id = account_copy,
++        });
++    }
++
++    pub fn getReplyRoute(
++        self: *SessionManager,
++        allocator: Allocator,
++        session_key: []const u8,
++    ) ?ReplyRouteSnapshot {
++        self.mutex.lock();
++        defer self.mutex.unlock();
++
++        const entry = self.reply_routes.get(session_key) orelse return null;
++        const channel_copy = allocator.dupe(u8, entry.channel) catch return null;
++        errdefer allocator.free(channel_copy);
++        const chat_copy = allocator.dupe(u8, entry.chat_id) catch return null;
++        errdefer allocator.free(chat_copy);
++        const account_copy = if (entry.account_id) |aid| allocator.dupe(u8, aid) catch return null else null;
++
++        return .{
++            .channel = channel_copy,
++            .chat_id = chat_copy,
++            .account_id = account_copy,
++        };
+     }
+ 
+     /// Find or create a session for the given key. Thread-safe.
 diff --git a/src/subagent.zig b/src/subagent.zig
 index 1d9ab1f..68ba5df 100644
 --- a/src/subagent.zig
