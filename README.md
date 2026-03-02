@@ -62,6 +62,7 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 12. 2026-03-02: Added `patches/0002-prune-tool-result-history.patch` to remove internal tool scaffolding from persisted history after each turn, fixing stale delayed tool-error echoes on subsequent turns.
 13. 2026-03-02: Increased default `NULLCLAW_MAX_ACTIONS_PER_HOUR` to `500` and hardened browser runbook/runtime prompt so agent never asks user for PinchTab token and retries public/internal endpoint automatically on unauthorized.
 14. 2026-03-02: Added `patches/0003-http-request-allow-private-hosts.patch` plus unrestricted autonomy defaults (`full`, wildcard commands/paths, approvals off, high-risk block off) for fully-open execution.
+15. 2026-03-02: Switched default `NULLCLAW_REWRITE_CONFIG=true` so env-driven runtime/security changes are always applied even with persisted `/data` volumes.
 
 ## Patch audit
 
@@ -100,7 +101,7 @@ Common:
 - `NULLCLAW_PROVIDER` (default: `openrouter`)
 - `NULLCLAW_MODEL` (optional)
 - `PORT` (default: `3000`)
-- `NULLCLAW_REWRITE_CONFIG` (`true` to regenerate config once, then set back to `false`)
+- `NULLCLAW_REWRITE_CONFIG` (default in this build: `true`; set `false` only if you want to keep manual edits in persisted config)
 
 ## Claude/OpenAI subscription auth
 
@@ -306,5 +307,5 @@ If relay URL/token are left as placeholders, this entrypoint auto-disables the w
 
 ## Notes
 
-- Config is generated on first boot. Set `NULLCLAW_REWRITE_CONFIG=true` for one deploy when changing env-driven config structure.
+- Config is generated/re-written by default on each boot in this build. Set `NULLCLAW_REWRITE_CONFIG=false` if you explicitly want to preserve manual config edits in `/data`.
 - Runtime image includes `curl`, `git`, `bash`, `ripgrep`, `jq`, `pinchtab`, `chromium`, `Xvfb`, `x11vnc`, and `noVNC` for shared human+agent browser sessions.
