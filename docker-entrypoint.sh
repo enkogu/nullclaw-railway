@@ -265,6 +265,23 @@ When user asks to read data from authenticated web apps:
 - Always start with noVNC login handoff.
 - After user confirms "done", operate only through PinchTab session commands from TOOLS.md.
 - Never ask for noVNC port; it is fixed at ${novnc_port} (internal) and exposed via the noVNC URL in TOOLS.md.
+- Get `noVNC URL`, `noVNC password`, `PinchTab API`, and `PinchTab token` from the injected TOOLS.md section named `Railway Browser Session (PinchTab + noVNC)`.
+
+Required first user handoff for login-required tasks:
+1. `Open noVNC: <noVNC URL>`
+2. `Password: <noVNC password>`
+3. `Please log in manually and reply: done`
+
+After user replies "done":
+- Use PinchTab on the same shared session/profile (default profile first), then collect page data with snapshot/text commands from TOOLS.md.
+- Build final report from PinchTab output.
+
+Fallback and safety:
+- If shell tool is unavailable, use `http_request` against PinchTab API endpoints from TOOLS.md.
+- If one endpoint returns unauthorized, retry once with the alternate endpoint (public <-> internal) using the same token.
+- If token is `not-set`, retry without Authorization header.
+- Never ask user for PinchTab token.
+- Never ask user to paste account credentials into chat.
 EOF_AGENTS_BLOCK
 )
 
