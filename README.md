@@ -46,6 +46,7 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 3. 2026-03-02: Added integrated PinchTab + noVNC runtime support for persistent human login + agent browser reuse.
 4. 2026-03-02: Fixed PinchTab startup health checks when `PINCHTAB_TOKEN` is set by probing `/health` with bearer auth.
 5. 2026-03-02: Simplified noVNC public exposure: single-port Caddy proxy is now opt-in via `PINCHTAB_NOVNC_PUBLIC_PATH`.
+6. 2026-03-02: Added noVNC headed auto-start (profile auto-create + optional auto-navigate) to prevent blank noVNC sessions after deploy/restart.
 
 ## Patch audit
 
@@ -175,6 +176,9 @@ Recommended env:
 - `PINCHTAB_VNC_PORT=5900`
 - `PINCHTAB_NOVNC_PORT=6080`
 - `PINCHTAB_NOVNC_PUBLIC_PATH=/novnc` (optional; set on Railway/single public port)
+- `PINCHTAB_NOVNC_AUTOSTART_HEADED=true` (default in this build; ensures noVNC is not blank)
+- `PINCHTAB_NOVNC_AUTOSTART_PROFILE=default`
+- `PINCHTAB_NOVNC_AUTOSTART_URL=https://example.com` (optional first page for headed auto-start)
 - Optional security:
   - `PINCHTAB_TOKEN=<api-token>`
   - `PINCHTAB_VNC_PASSWORD=<vnc-password>`
@@ -219,6 +223,7 @@ Note:
 - If `PINCHTAB_NOVNC_PUBLIC_PATH` is set, entrypoint starts `caddy`:
   - `/<novnc-path>/*` -> noVNC (`PINCHTAB_NOVNC_PORT`)
   - all other paths -> nullclaw gateway (`PORT`)
+- On startup with noVNC enabled, entrypoint auto-creates/starts a headed PinchTab profile so browser window is visible immediately in noVNC.
 
 ### Playwright MCP (Legacy / Optional)
 
