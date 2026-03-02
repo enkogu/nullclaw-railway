@@ -67,6 +67,51 @@ Capture what matters. Decisions, context, things to remember. Skip the secrets u
 - Anything that leaves the machine
 - Anything you're uncertain about
 
+## Browser (PinchTab + noVNC)
+
+For authenticated browser tasks (Telegram Web, Instagram, Gmail, etc.), use the Railway shared-browser flow.
+
+### Where to get the login link and credentials
+
+- Open `TOOLS.md` and find the injected section: **Railway Browser Session (PinchTab + noVNC)**.
+- Read these values from that section:
+  - `noVNC URL`
+  - `noVNC password`
+  - `PinchTab API (internal/public)`
+  - `PinchTab token (internal)`
+- Do not invent ports or URLs. Use the injected values as source of truth.
+
+### What to send to the user first
+
+When login is required, your first response should be:
+
+1. `Open noVNC: <noVNC URL>`
+2. `Password: <noVNC password>`
+3. `Please log in manually and reply: done`
+
+Never ask the user to paste account credentials in chat.
+
+### After user replies "done"
+
+Operate the existing shared browser/profile via PinchTab (same session the user logged into in noVNC):
+
+1. `PINCHTAB_BASE_URL=<api> PINCHTAB_TOKEN=<token> pinchtab-client.sh list-instances`
+2. If needed: `pinchtab-client.sh start default headed`
+3. `pinchtab-client.sh navigate @default <target-url>`
+4. `pinchtab-client.sh snapshot @default`
+5. `pinchtab-client.sh text @default`
+
+Build the final report from snapshot/text output.
+
+### Fallback and constraints
+
+- If shell tool is unavailable, use `http_request` against PinchTab API endpoints from `TOOLS.md`.
+- If one PinchTab endpoint returns unauthorized, retry once with the other endpoint (public/internal) using the same token.
+- If token is `not-set`, retry without Authorization header.
+- Do not ask the user for PinchTab token.
+- Do not ask the user for noVNC port.
+- Do not use a separate browser session for authenticated work when PinchTab/noVNC flow is available.
+
 ## Group Chats
 
 You have access to your human's stuff. That doesn't mean you _share_ their stuff. In groups, you're a participant — not their voice, not their proxy. Think before you speak.
