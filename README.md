@@ -58,6 +58,7 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 10. 2026-03-02: Simplified noVNC public exposure: single-port Caddy proxy is now opt-in via `PINCHTAB_NOVNC_PUBLIC_PATH`.
 11. 2026-03-02: Added noVNC headed auto-start (profile auto-create + optional auto-navigate) to prevent blank noVNC sessions after deploy/restart.
 12. 2026-03-02: Added `patches/0002-prune-tool-result-history.patch` to remove internal tool scaffolding from persisted history after each turn, fixing stale delayed tool-error echoes on subsequent turns.
+13. 2026-03-02: Increased default `NULLCLAW_MAX_ACTIONS_PER_HOUR` to `500` and hardened browser runbook/runtime prompt so agent never asks user for PinchTab token and retries public/internal endpoint automatically on unauthorized.
 
 ## Patch audit
 
@@ -247,6 +248,7 @@ Playwright MCP env keys remain supported in config generation, but this image no
 ### Shell access / autonomy
 
 - `NULLCLAW_AUTONOMY_LEVEL=supervised|full|...`
+- `NULLCLAW_MAX_ACTIONS_PER_HOUR=500` (default in this build; raise if long browser workflows still hit autonomy rate limit)
 - `NULLCLAW_ALLOWED_COMMANDS=*` (CSV; set `*` for wildcard)
 - `NULLCLAW_ALLOWED_PATHS=*` (CSV; set `*` for wildcard)
 - `NULLCLAW_WORKSPACE_ONLY=true|false`

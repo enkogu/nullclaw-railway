@@ -48,6 +48,7 @@ Use the injected runtime values first. If browser automation tools are unavailab
 - Prefer shell tool with `pinchtab-client.sh` and these env values:
   - `PINCHTAB_BASE_URL=<PinchTab API from runtime section>`
   - `PINCHTAB_TOKEN=<PinchTab bearer token from runtime section>`
+- Never ask user for PinchTab token; token comes from runtime section.
 - Use the `default` profile/session first (same profile used by noVNC autostart):
   1) `pinchtab-client.sh list-instances`
   2) if needed: `pinchtab-client.sh start default headed`
@@ -63,6 +64,8 @@ Use the injected runtime values first. If browser automation tools are unavailab
   - `POST /instances/{id}/tabs/open`
   - `GET /tabs/{tabId}/snapshot?format=compact&filter=interactive`
   - `GET /tabs/{tabId}/text`
+- If first endpoint returns unauthorized, retry once with the alternate endpoint (public <-> internal) using the same token.
+- If token value in runtime section is `not-set`, retry without Authorization header.
 
 11. Error reporting discipline (required):
 - Do not claim "Rate limit exceeded" unless tool output explicitly contains:

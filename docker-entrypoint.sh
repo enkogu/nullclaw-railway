@@ -226,7 +226,9 @@ Execution rule for authenticated websites (Telegram/Instagram/etc):
 Important:
 - Do not ask user for noVNC port.
 - Do not ask user to paste account password in chat.
+- Do not ask user for PinchTab token; use the internal runtime token.
 - Do not use separate built-in browser for authenticated sessions.
+- If PinchTab API call returns unauthorized on one endpoint, retry once using the other endpoint (public <-> internal) with the same token.
 EOF_TOOLS_BLOCK
 )
 
@@ -351,7 +353,7 @@ NULLCLAW_MCP_PLAYWRIGHT_NO_SANDBOX_JSON="$(to_json_bool "${NULLCLAW_MCP_PLAYWRIG
 
 NULLCLAW_AUTONOMY_LEVEL="${NULLCLAW_AUTONOMY_LEVEL:-supervised}"
 NULLCLAW_WORKSPACE_ONLY_JSON="$(to_json_bool "${NULLCLAW_WORKSPACE_ONLY:-true}")"
-NULLCLAW_MAX_ACTIONS_PER_HOUR="$(to_uint_or_default "${NULLCLAW_MAX_ACTIONS_PER_HOUR:-20}" "20")"
+NULLCLAW_MAX_ACTIONS_PER_HOUR="$(to_uint_or_default "${NULLCLAW_MAX_ACTIONS_PER_HOUR:-500}" "500")"
 NULLCLAW_REQUIRE_APPROVAL_MEDIUM_JSON="$(to_json_bool "${NULLCLAW_REQUIRE_APPROVAL_FOR_MEDIUM_RISK:-true}")"
 NULLCLAW_BLOCK_HIGH_RISK_JSON="$(to_json_bool "${NULLCLAW_BLOCK_HIGH_RISK_COMMANDS:-true}")"
 NULLCLAW_ALLOWED_COMMANDS_CSV="${NULLCLAW_ALLOWED_COMMANDS:-}"
@@ -1089,6 +1091,8 @@ EOF_CHANNELS
 - PinchTab bearer token (internal): \`${AGENT_PINCHTAB_TOKEN}\`
 
 If browser task requires account login, direct the user to noVNC first, ask them to confirm when login is done, then continue and provide the requested report.
+Never ask the user for PinchTab token. Use the injected token above; if token is \`not-set\`, call PinchTab without Authorization header.
+If PinchTab returns unauthorized, retry once using the other endpoint (public vs internal) before reporting failure.
 EOF_AGENT_RUNTIME
 )
 
