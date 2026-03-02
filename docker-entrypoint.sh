@@ -258,13 +258,13 @@ Important:
 EOF_TOOLS_BLOCK
 )
 
-  agents_block=$(cat <<EOF_AGENTS_BLOCK
+  agents_block=$(cat <<'EOF_AGENTS_BLOCK'
 ## Browser Control Rule (Railway)
 
 When user asks to read data from authenticated web apps:
 - Always start with noVNC login handoff.
 - After user confirms "done", operate only through PinchTab session commands from TOOLS.md.
-- Never ask for noVNC port; it is fixed at ${novnc_port} (internal) and exposed via the noVNC URL in TOOLS.md.
+- Never ask for noVNC port; it is fixed at __NOVNC_PORT__ (internal) and exposed via the noVNC URL in TOOLS.md.
 - Get `noVNC URL`, `noVNC password`, `PinchTab API`, and `PinchTab token` from the injected TOOLS.md section named `Railway Browser Session (PinchTab + noVNC)`.
 
 Required first user handoff for login-required tasks:
@@ -284,6 +284,7 @@ Fallback and safety:
 - Never ask user to paste account credentials into chat.
 EOF_AGENTS_BLOCK
 )
+  agents_block="$(printf '%s' "$agents_block" | sed "s/__NOVNC_PORT__/${novnc_port}/g")"
 
   upsert_marked_block "$tools_file" "<!-- NULLCLAW_RAILWAY_BROWSER_START -->" "<!-- NULLCLAW_RAILWAY_BROWSER_END -->" "$tools_block"
   upsert_marked_block "$agents_file" "<!-- NULLCLAW_RAILWAY_BROWSER_START -->" "<!-- NULLCLAW_RAILWAY_BROWSER_END -->" "$agents_block"
