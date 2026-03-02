@@ -12,10 +12,14 @@ nullclaw gateway --host 0.0.0.0 --port $PORT
 
 - Upstream source: `https://github.com/nullclaw/nullclaw`
 - Default pinned ref: `4101f63` (change with Docker build arg `NULLCLAW_REF`)
-- Applies local patch: `patches/0001-subagent-wakeup.patch`
-  - subagent completion wakes the main session
-  - reply is routed back to the original channel/chat (including Telegram)
-  - subagent execution uses the provider runtime stack (fixes `ProviderError` on Anthropic-style providers)
+- Applies local patches:
+  - `patches/0001-subagent-wakeup.patch`
+    - subagent completion wakes the main session
+    - reply is routed back to the original channel/chat (including Telegram)
+    - subagent execution uses the provider runtime stack (fixes `ProviderError` on Anthropic-style providers)
+  - `patches/0002-prune-tool-result-history.patch`
+    - prunes internal `<tool_call>/<tool_result>` scaffolding from persisted chat history after each turn
+    - prevents stale previous-turn tool errors from being re-interpreted as fresh failures in the next turn
 - Health endpoint: `/health`
 - Default agent browser runbook: `agent/AGENT_BROWSER_NOVNC.md` (injected into `agents.defaults.system_prompt` at startup)
 
@@ -34,7 +38,7 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 
 ## How this build differs from upstream nullclaw
 
-- Pinned build from upstream commit `4101f63` plus one local source patch for subagent wake-up and reply routing.
+- Pinned build from upstream commit `4101f63` plus two local source patches (subagent wake-up routing + tool-result history pruning).
 - Railway-oriented runtime image with PinchTab, noVNC, Chromium, and optional Caddy proxy.
 - Entry-point config bootstrap from env with stricter value sanitizing and provider/auth wiring.
 - PinchTab health probe supports authenticated `/health` checks (`PINCHTAB_TOKEN`) to avoid startup loops.
@@ -53,13 +57,14 @@ Patch location: `patches/0001-subagent-wakeup.patch`
 9. 2026-03-02: Fixed PinchTab startup health checks when `PINCHTAB_TOKEN` is set by probing `/health` with bearer auth.
 10. 2026-03-02: Simplified noVNC public exposure: single-port Caddy proxy is now opt-in via `PINCHTAB_NOVNC_PUBLIC_PATH`.
 11. 2026-03-02: Added noVNC headed auto-start (profile auto-create + optional auto-navigate) to prevent blank noVNC sessions after deploy/restart.
+12. 2026-03-02: Added `patches/0002-prune-tool-result-history.patch` to remove internal tool scaffolding from persisted history after each turn, fixing stale delayed tool-error echoes on subsequent turns.
 
 ## Patch audit
 
 1. Keep `patches/0001-subagent-wakeup.patch`: this is the core fix for your Telegram subagent completion visibility problem.
-2. Keep authenticated PinchTab health check in `docker-entrypoint.sh`: required for Railway stability when `PINCHTAB_TOKEN` is enabled.
-3. Keep single-port noVNC proxy support, but only as opt-in (`PINCHTAB_NOVNC_PUBLIC_PATH`) to reduce default runtime complexity.
-4. No additional nullclaw source patches are carried; repository source delta stays minimal (one patch file).
+2. Keep `patches/0002-prune-tool-result-history.patch`: prevents cross-turn stale `tool_result` contamination that produces delayed/duplicate error narratives.
+3. Keep authenticated PinchTab health check in `docker-entrypoint.sh`: required for Railway stability when `PINCHTAB_TOKEN` is enabled.
+4. Keep single-port noVNC proxy support, but only as opt-in (`PINCHTAB_NOVNC_PUBLIC_PATH`) to reduce default runtime complexity.
 
 ## Deploy on Railway
 

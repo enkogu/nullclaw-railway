@@ -11,7 +11,10 @@ WORKDIR /src
 COPY patches /tmp/patches
 RUN git clone "${NULLCLAW_REPO}" nullclaw \
     && git -C /src/nullclaw checkout "${NULLCLAW_REF}"
-RUN git -C /src/nullclaw apply /tmp/patches/0001-subagent-wakeup.patch
+RUN set -eu; \
+    for patch in /tmp/patches/*.patch; do \
+      git -C /src/nullclaw apply "$patch"; \
+    done
 
 WORKDIR /src/nullclaw
 ARG TARGETARCH
