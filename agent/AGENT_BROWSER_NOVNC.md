@@ -63,3 +63,10 @@ Use the injected runtime values first. If browser automation tools are unavailab
   - `POST /instances/{id}/tabs/open`
   - `GET /tabs/{tabId}/snapshot?format=compact&filter=interactive`
   - `GET /tabs/{tabId}/text`
+
+11. Error reporting discipline (required):
+- Do not claim "Rate limit exceeded" unless tool output explicitly contains:
+  - HTTP status code (for example `429`) and
+  - response body text from the failing endpoint.
+- If the phrase came from stale/previous tool output, ignore it and retry once with a fresh single request.
+- For any BLOCKED response, include exact failing command/endpoint and the raw error line.
