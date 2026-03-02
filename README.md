@@ -124,7 +124,7 @@ This image runs PinchTab inside the same container as nullclaw:
 
 - PinchTab API/dashboard: `:9867`
 - noVNC (browser login UI): `:6080` (`/vnc.html`)
-- nullclaw gateway: `:3000`
+- nullclaw gateway: `:3000` (or proxied through `caddy` for single-port platforms)
 
 Recommended env:
 
@@ -138,6 +138,7 @@ Recommended env:
 - `PINCHTAB_SCREEN=1280x720x24`
 - `PINCHTAB_VNC_PORT=5900`
 - `PINCHTAB_NOVNC_PORT=6080`
+- `PINCHTAB_NOVNC_PUBLIC_PATH=/novnc` (recommended on Railway/single public port)
 - Optional security:
   - `PINCHTAB_TOKEN=<api-token>`
   - `PINCHTAB_VNC_PASSWORD=<vnc-password>`
@@ -151,7 +152,8 @@ curl -X POST http://localhost:9867/instances/start \
   -d '{"profileId":"user-123","mode":"headed"}'
 
 # 2) User opens noVNC and logs in manually
-# http://<host>:6080/vnc.html?autoconnect=1&resize=scale
+# Direct port:   http://<host>:6080/vnc.html?autoconnect=1&resize=scale
+# Railway proxy: https://<host>/novnc/vnc.html?autoconnect=1&resize=scale
 
 # 3) Stop headed instance
 curl -X POST http://localhost:9867/instances/<instance-id>/stop
@@ -178,8 +180,9 @@ Helper client (`scripts/pinchtab-client.sh`):
 - `scripts/pinchtab-client.sh snapshot @user-123`
 
 Note:
-- noVNC needs an additional exposed port (`PINCHTAB_NOVNC_PORT`, default `6080`).
-- If your platform exposes only one public port, run noVNC/PinchTab behind an additional proxy or separate service.
+- If `PINCHTAB_NOVNC_PUBLIC_PATH` is set (defaulted to `/novnc` when noVNC is enabled), entrypoint starts `caddy`:
+  - `/<novnc-path>/*` -> noVNC (`PINCHTAB_NOVNC_PORT`)
+  - all other paths -> nullclaw gateway (`PORT`)
 
 ### Playwright MCP (Legacy / Optional)
 

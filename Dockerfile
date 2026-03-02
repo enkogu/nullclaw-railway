@@ -46,7 +46,7 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/pinchtab ./cmd/pinchtab
 FROM alpine:3.23 AS runtime
 
 RUN apk add --no-cache \
-    ca-certificates tzdata curl git bash ripgrep jq \
+    ca-certificates tzdata curl git bash ripgrep jq caddy \
     chromium nss freetype harfbuzz ttf-freefont \
     xvfb x11vnc novnc websockify
 

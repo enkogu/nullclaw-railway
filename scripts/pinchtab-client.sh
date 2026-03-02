@@ -235,6 +235,7 @@ Environment:
   PINCHTAB_TOKEN            optional Bearer token
   PINCHTAB_SESSION_MAP_DIR  default: ~/.nullclaw/pinchtab-sessions
   PINCHTAB_NOVNC_PORT       default: 6080
+  PINCHTAB_NOVNC_PUBLIC_PATH optional path prefix (e.g. /novnc)
   PINCHTAB_INSTANCE_READY_TIMEOUT_SECS default: 30
 EOF
 }
@@ -406,8 +407,23 @@ case "$cmd" in
     ;;
   novnc-url)
     host="${2:-localhost}"
-    port="${PINCHTAB_NOVNC_PORT:-6080}"
-    printf 'http://%s:%s/vnc.html?autoconnect=1&resize=scale\n' "$host" "$port"
+    public_path="${PINCHTAB_NOVNC_PUBLIC_PATH:-}"
+    if [ -n "$public_path" ]; then
+      if [ "${public_path#/}" = "$public_path" ]; then
+        public_path="/${public_path}"
+      fi
+      if [ "$public_path" != "/" ]; then
+        public_path="${public_path%/}"
+      fi
+      case "$host" in
+        http://*|https://*) ;;
+        *) host="https://${host}" ;;
+      esac
+      printf '%s%s/vnc.html?autoconnect=1&resize=scale\n' "$host" "$public_path"
+    else
+      port="${PINCHTAB_NOVNC_PORT:-6080}"
+      printf 'http://%s:%s/vnc.html?autoconnect=1&resize=scale\n' "$host" "$port"
+    fi
     ;;
   ""|-h|--help|help)
     usage
