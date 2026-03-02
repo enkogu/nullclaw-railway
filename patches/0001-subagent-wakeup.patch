@@ -1,5 +1,5 @@
 diff --git a/src/daemon.zig b/src/daemon.zig
-index 3d279d7..eda197f 100644
+index 3d279d7..4fab356 100644
 --- a/src/daemon.zig
 +++ b/src/daemon.zig
 @@ -601,6 +601,65 @@ fn clearInboundProcessingIndicator(
@@ -179,10 +179,16 @@ index 3d279d7..eda197f 100644
      // Spawn channel supervisor thread (only if channels are configured)
      var chan_thread: ?std.Thread = null;
 diff --git a/src/subagent.zig b/src/subagent.zig
-index 1d9ab1f..d857afc 100644
+index 1d9ab1f..68ba5df 100644
 --- a/src/subagent.zig
 +++ b/src/subagent.zig
-@@ -61,6 +61,8 @@ pub const SubagentManager = struct {
+@@ -56,11 +56,14 @@ pub const SubagentManager = struct {
+     mutex: std.Thread.Mutex,
+     config: SubagentConfig,
+     bus: ?*bus_mod.Bus,
++    runtime_cfg: *const config_mod.Config,
+ 
+     // Context needed for creating providers in subagent threads
      api_key: ?[]const u8,
      default_provider: []const u8,
      default_model: ?[]const u8,
@@ -191,7 +197,11 @@ index 1d9ab1f..d857afc 100644
      workspace_dir: []const u8,
      agents: []const config_mod.NamedAgentConfig,
      http_enabled: bool,
-@@ -81,6 +83,8 @@ pub const SubagentManager = struct {
+@@ -78,9 +81,12 @@ pub const SubagentManager = struct {
+             .mutex = .{},
+             .config = subagent_config,
+             .bus = bus,
++            .runtime_cfg = cfg,
              .api_key = cfg.defaultProviderKey(),
              .default_provider = cfg.default_provider,
              .default_model = cfg.default_model,
@@ -200,7 +210,7 @@ index 1d9ab1f..d857afc 100644
              .workspace_dir = cfg.workspace_dir,
              .agents = cfg.agents,
              .http_enabled = cfg.http_request.enabled,
-@@ -203,6 +207,7 @@ pub const SubagentManager = struct {
+@@ -203,6 +209,7 @@ pub const SubagentManager = struct {
          const owned_err = if (err_msg) |e| self.allocator.dupe(u8, e) catch null else null;
  
          var label: []const u8 = "subagent";
@@ -208,7 +218,7 @@ index 1d9ab1f..d857afc 100644
          {
              self.mutex.lock();
              defer self.mutex.unlock();
-@@ -212,6 +217,7 @@ pub const SubagentManager = struct {
+@@ -212,6 +219,7 @@ pub const SubagentManager = struct {
                  state.error_msg = owned_err;
                  state.completed_at = std.time.milliTimestamp();
                  label = state.label;
@@ -216,7 +226,7 @@ index 1d9ab1f..d857afc 100644
              }
          }
  
-@@ -226,11 +232,11 @@ pub const SubagentManager = struct {
+@@ -226,11 +234,11 @@ pub const SubagentManager = struct {
  
              const msg = bus_mod.makeInbound(
                  self.allocator,
@@ -231,7 +241,7 @@ index 1d9ab1f..d857afc 100644
              ) catch {
                  self.allocator.free(content);
                  return;
-@@ -256,28 +262,36 @@ fn subagentThreadFn(ctx: *ThreadContext) void {
+@@ -256,28 +264,31 @@ fn subagentThreadFn(ctx: *ThreadContext) void {
          ctx.manager.allocator.destroy(ctx);
      }
  
@@ -250,21 +260,15 @@ index 1d9ab1f..d857afc 100644
 -        .default_model = ctx.manager.default_model,
 -        .temperature = @as(f64, 0.7),
 -        .max_tokens = @as(?u64, null),
--    };
-+    const provider_key = if (ctx.manager.api_key) |key|
-+        if (key.len > 0) key else null
-+    else
-+        null;
-+
-+    var provider_holder = providers.ProviderHolder.fromConfig(
++    var provider_bundle = providers.runtime_bundle.RuntimeProviderBundle.init(
 +        cfg_arena.allocator(),
-+        ctx.manager.default_provider,
-+        provider_key,
-+        ctx.manager.default_provider_base_url,
-+        ctx.manager.default_provider_native_tools,
-+    );
-+    defer provider_holder.deinit();
-+    const provider = provider_holder.provider();
++        ctx.manager.runtime_cfg,
++    ) catch |err| {
++        ctx.manager.completeTask(ctx.task_id, null, @errorName(err));
++        return;
+     };
++    defer provider_bundle.deinit();
++    const provider = provider_bundle.provider();
  
 -    const result = providers.completeWithSystem(
 +    const model_name = ctx.manager.default_model orelse {
