@@ -164,6 +164,84 @@ cleanup_stale_chromium_locks() {
   done
 }
 
+upsert_marked_block() {
+  target_file="$1"
+  marker_start="$2"
+  marker_end="$3"
+  block_content="$4"
+
+  mkdir -p "$(dirname "$target_file")"
+  [ -f "$target_file" ] || : > "$target_file"
+
+  tmp_file="${target_file}.tmp.$$"
+  awk -v start="$marker_start" -v end="$marker_end" '
+    BEGIN { skipping = 0 }
+    $0 == start { skipping = 1; next }
+    $0 == end { skipping = 0; next }
+    skipping == 0 { print }
+  ' "$target_file" > "$tmp_file"
+
+  {
+    cat "$tmp_file"
+    printf '\n%s\n' "$marker_start"
+    printf '%s\n' "$block_content"
+    printf '%s\n' "$marker_end"
+  } > "${tmp_file}.new"
+
+  mv "${tmp_file}.new" "$target_file"
+  rm -f "$tmp_file"
+}
+
+write_workspace_browser_docs() {
+  workspace_root="$1"
+  novnc_url="$2"
+  novnc_password="$3"
+  pinchtab_api="$4"
+  pinchtab_token="$5"
+  novnc_port="$6"
+
+  tools_file="${workspace_root}/TOOLS.md"
+  agents_file="${workspace_root}/AGENTS.md"
+
+  tools_block=$(cat <<EOF_TOOLS_BLOCK
+## Railway Browser Session (PinchTab + noVNC)
+
+- noVNC URL: ${novnc_url}
+- noVNC password: ${novnc_password}
+- noVNC port (internal): ${novnc_port}
+- PinchTab API (internal): ${pinchtab_api}
+- PinchTab token (internal): ${pinchtab_token}
+
+Execution rule for authenticated websites (Telegram/Instagram/etc):
+1. Tell user to log in via noVNC first.
+2. Wait for user message: "done".
+3. Use PinchTab commands (same browser/profile as noVNC):
+   - PINCHTAB_BASE_URL=${pinchtab_api} PINCHTAB_TOKEN=${pinchtab_token} pinchtab-client.sh list-instances
+   - PINCHTAB_BASE_URL=${pinchtab_api} PINCHTAB_TOKEN=${pinchtab_token} pinchtab-client.sh navigate @default https://web.telegram.org
+   - PINCHTAB_BASE_URL=${pinchtab_api} PINCHTAB_TOKEN=${pinchtab_token} pinchtab-client.sh snapshot @default
+   - PINCHTAB_BASE_URL=${pinchtab_api} PINCHTAB_TOKEN=${pinchtab_token} pinchtab-client.sh text @default
+
+Important:
+- Do not ask user for noVNC port.
+- Do not ask user to paste account password in chat.
+- Do not use separate built-in browser for authenticated sessions.
+EOF_TOOLS_BLOCK
+)
+
+  agents_block=$(cat <<EOF_AGENTS_BLOCK
+## Browser Control Rule (Railway)
+
+When user asks to read data from authenticated web apps:
+- Always start with noVNC login handoff.
+- After user confirms "done", operate only through PinchTab session commands from TOOLS.md.
+- Never ask for noVNC port; it is fixed at ${novnc_port} (internal) and exposed via the noVNC URL in TOOLS.md.
+EOF_AGENTS_BLOCK
+)
+
+  upsert_marked_block "$tools_file" "<!-- NULLCLAW_RAILWAY_BROWSER_START -->" "<!-- NULLCLAW_RAILWAY_BROWSER_END -->" "$tools_block"
+  upsert_marked_block "$agents_file" "<!-- NULLCLAW_RAILWAY_BROWSER_START -->" "<!-- NULLCLAW_RAILWAY_BROWSER_END -->" "$agents_block"
+}
+
 # Railway users often paste quoted values (KEY="value"). Normalize selected envs
 # so booleans/numbers/provider names and tokens are parsed correctly.
 for _env_name in \
@@ -508,6 +586,15 @@ if [ "${MODEL#${PROVIDER}/}" != "$MODEL" ]; then
 else
   PRIMARY_MODEL="${PROVIDER}/${MODEL}"
 fi
+
+WORKSPACE_NOVNC_URL="$NOVNC_PUBLIC_URL"
+if [ -z "$WORKSPACE_NOVNC_URL" ]; then
+  WORKSPACE_NOVNC_URL="http://127.0.0.1:${PINCHTAB_NOVNC_PORT}/vnc.html?autoconnect=1&resize=scale"
+fi
+WORKSPACE_NOVNC_PASSWORD="${PINCHTAB_VNC_PASSWORD:-not-set}"
+WORKSPACE_PINCHTAB_API="http://127.0.0.1:${PINCHTAB_PORT}"
+WORKSPACE_PINCHTAB_TOKEN="${PINCHTAB_TOKEN:-not-set}"
+write_workspace_browser_docs "$WORKSPACE_DIR" "$WORKSPACE_NOVNC_URL" "$WORKSPACE_NOVNC_PASSWORD" "$WORKSPACE_PINCHTAB_API" "$WORKSPACE_PINCHTAB_TOKEN" "$PINCHTAB_NOVNC_PORT"
 
 if [ ! -f "$CONFIG_PATH" ] || [ "$REWRITE_CONFIG" = "true" ]; then
   if [ "$IS_OAUTH_PROVIDER" != "true" ] && [ -z "$API_KEY" ]; then
