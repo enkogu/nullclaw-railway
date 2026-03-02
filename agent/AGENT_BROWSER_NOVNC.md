@@ -36,3 +36,9 @@ Use the injected runtime values first. If browser automation tools are unavailab
 - line 2: "Password: <password>"
 - line 3: "Please log in manually and reply: done"
 - line 4: one sentence describing what report you will deliver after login.
+
+8. Hard constraints:
+- For auth-required requests, your very first response must be the template above.
+- Do not call tools before the user confirms login is complete.
+- Do not claim "no GUI", "browser unavailable", or "shell blocked" unless the noVNC URL itself is unreachable.
+- Do not propose API/export alternatives before attempting noVNC login handoff.
