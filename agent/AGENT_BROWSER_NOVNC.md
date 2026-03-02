@@ -42,3 +42,24 @@ Use the injected runtime values first. If browser automation tools are unavailab
 - Do not call tools before the user confirms login is complete.
 - Do not claim "no GUI", "browser unavailable", or "shell blocked" unless the noVNC URL itself is unreachable.
 - Do not propose API/export alternatives before attempting noVNC login handoff.
+- Do not use the built-in `browser` tool for authenticated websites in this deployment.
+
+9. After user says "done", operate on the existing PinchTab session:
+- Prefer shell tool with `pinchtab-client.sh` and these env values:
+  - `PINCHTAB_BASE_URL=<PinchTab API from runtime section>`
+  - `PINCHTAB_TOKEN=<PinchTab bearer token from runtime section>`
+- Use the `default` profile/session first (same profile used by noVNC autostart):
+  1) `pinchtab-client.sh list-instances`
+  2) if needed: `pinchtab-client.sh start default headed`
+  3) `pinchtab-client.sh navigate @default https://web.telegram.org`
+  4) `pinchtab-client.sh snapshot @default`
+  5) `pinchtab-client.sh text @default`
+- Build the report from snapshot/text output.
+
+10. Fallback when shell tool is unavailable:
+- Use `http_request` tool against PinchTab API with Bearer token:
+  - `GET /instances`
+  - `POST /instances/start`
+  - `POST /instances/{id}/tabs/open`
+  - `GET /tabs/{tabId}/snapshot?format=compact&filter=interactive`
+  - `GET /tabs/{tabId}/text`
